@@ -28,6 +28,15 @@ void SETSOCKETOPT(int sockfd) {
 	}
 #endif
 
+#ifdef IPV6_V6ONLY
+  int On = 0;
+  ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &On, sizeof(On));
+  if (ret){
+    LOG("ERROR", "TCP_NODELAY 设置失败.");
+    return exit(-1);
+  }
+#endif
+
 }
 
 static int

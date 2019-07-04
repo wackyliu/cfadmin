@@ -51,13 +51,14 @@ void SETSOCKETOPT(int sockfd, int mode){
     return exit(-1);
   }
 
-  /* 开启 TCP keepalive */
-  /*
-  ret = setsockopt(sockfd, IPPROTO_TCP, SO_KEEPALIVE, &Enable , sizeof(Enable));
+#ifdef IPV6_V6ONLY
+  int On = 0;
+  ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &On, sizeof(On));
   if (ret){
-    LOG("ERROR", "SO_KEEPALIVE 设置失败.");
+    LOG("ERROR", "TCP_NODELAY 设置失败.");
     return exit(-1);
-  }*/
+  }
+#endif
 
 #ifdef TCP_DEFER_ACCEPT
   if (mode == SERVER) {
