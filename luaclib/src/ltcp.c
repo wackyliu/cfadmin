@@ -16,13 +16,7 @@ void SETSOCKETOPT(int sockfd, int mode){
   int ret = 0;
 
 	/* 设置非阻塞 */
-  if (mode == SERVER) {
-    ret = non_blocking(sockfd);
-    if (ret) {
-      LOG("ERROR", "non_blocking 设置失败.");
-      return exit(-1);
-    }
-  }
+	// non_blocking(sockfd);
 
 #ifdef SO_REUSEADDR
   /* 地址重用 */
