@@ -11,7 +11,7 @@ INCLUDES += -I/usr/local/include
 LIBS += -L./ -L../ -L/usr/local/lib
 # CFLAGS = -Wall -O3 -fPIC --shared -DJEMALLOC -ljemalloc
 # CFLAGS = -Wall -O3 -fPIC --shared -DTCMALLOC -ltcmalloc
-CFLAGS = -Wall -O3 -fPIC --shared
+CFLAGS = -Wall -O3 -fPIC --shared -g
 
 build :
 	$(CC) -o sys.so src/lsys.c $(CFLAGS) $(INCLUDES) $(LIBS) -lcore
