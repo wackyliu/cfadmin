@@ -9,7 +9,7 @@ void SETSOCKETOPT(int sockfd) {
 	int ret = 0;
 
 	/* 设置非阻塞 */
-	// non_blocking(sockfd);
+	non_blocking(sockfd);
 
 #ifdef SO_REUSEADDR
    /* 端口重用 */

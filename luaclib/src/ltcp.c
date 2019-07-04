@@ -11,15 +11,15 @@
 static inline
 void SETSOCKETOPT(int sockfd, int mode){
 
-  socklen_t Enable = 1;
+  int Enable = 1;
 
   int ret = 0;
 
 	/* 设置非阻塞 */
-	// non_blocking(sockfd);
+	non_blocking(sockfd);
 
+/* 地址重用 */
 #ifdef SO_REUSEADDR
-  /* 地址重用 */
   ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &Enable, sizeof(Enable));
 	if (ret) {
 		LOG("ERROR", "设置 SO_REUSEADDR 失败.");
@@ -27,9 +27,9 @@ void SETSOCKETOPT(int sockfd, int mode){
 	}
 #endif
 
+/* 端口重用 */
 #ifdef SO_REUSEPORT
   if (mode == SERVER) {
-    /* 端口重用 */
   	ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &Enable, sizeof(Enable));
   	if (ret) {
   		LOG("ERROR", "设置 SO_REUSEPORT 失败.");
@@ -38,8 +38,9 @@ void SETSOCKETOPT(int sockfd, int mode){
   }
 #endif
 
+/* 关闭IPv6 Only */
 #ifdef IPV6_V6ONLY
-  socklen_t On = 0;
+  int On = 0;
   ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &On, sizeof(On));
   if (ret){
     LOG("ERROR", "IPV6_V6ONLY 设置失败.");
