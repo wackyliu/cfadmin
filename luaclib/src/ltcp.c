@@ -16,10 +16,12 @@ void SETSOCKETOPT(int sockfd, int mode){
   int ret = 0;
 
 	/* 设置非阻塞 */
-  ret = non_blocking(sockfd);
-  if (ret) {
-    LOG("ERROR", "non_blocking 设置失败.");
-    return exit(-1);
+  if (mode == SERVER) {
+    ret = non_blocking(sockfd);
+    if (ret) {
+      LOG("ERROR", "non_blocking 设置失败.");
+      return exit(-1);
+    }
   }
 
 #ifdef SO_REUSEADDR
@@ -50,11 +52,12 @@ void SETSOCKETOPT(int sockfd, int mode){
   }
 
   /* 开启 TCP keepalive */
+  /*
   ret = setsockopt(sockfd, IPPROTO_TCP, SO_KEEPALIVE, &Enable , sizeof(Enable));
   if (ret){
     LOG("ERROR", "SO_KEEPALIVE 设置失败.");
     return exit(-1);
-  }
+  }*/
 
 #ifdef TCP_DEFER_ACCEPT
   if (mode == SERVER) {
