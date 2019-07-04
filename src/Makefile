@@ -29,11 +29,11 @@ MACRO += -w -O3 -Wl,-rpath,./
 
 build :
 
-	$(CC) -o libcore.so core.c core_ev.c core_memory.c core_sys.c $(CFLAGS) $(INCLUDES) $(LIBS) $(DLL)
+	$(CC) -o libcore.dll core.c core_ev.c core_memory.c core_sys.c $(CFLAGS) $(INCLUDES) $(LIBS) $(DLL)
 
 	$(CC) -o cfadmin core_start.c $(MACRO) $(INCLUDES) $(LIBS) -lcore
 
-	mv *.so cfadmin ../
+	mv *.dll *.exe ../
 
 rebuild:
 
@@ -41,8 +41,8 @@ rebuild:
 
 	$(CC) -o cfadmin core_start.c $(MACRO) $(INCLUDES) $(LIBS) -lcore
 
-	mv *.so cfadmin ../
+	mv *.dll *.exe ../
 
 clean :
 
-	rm -rf *.o *.so
+	rm -rf *.dll *.exe
