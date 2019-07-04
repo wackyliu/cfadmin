@@ -11,15 +11,17 @@
 static inline
 void SETSOCKETOPT(int sockfd, int mode){
 
-  int Enable = 1;
+  socklen_t Enable = 1;
 
   int ret = 0;
 
 	/* 设置非阻塞 */
-  ret = non_blocking(sockfd);
-  if (ret) {
-    LOG("ERROR", "non_blocking 设置失败.");
-    return exit(-1);
+  if (mode == SERVER) {
+    ret = non_blocking(sockfd);
+    if (ret) {
+      LOG("ERROR", "non_blocking 设置失败.");
+      return exit(-1);
+    }
   }
 
 #ifdef SO_REUSEADDR
@@ -43,7 +45,7 @@ void SETSOCKETOPT(int sockfd, int mode){
 #endif
 
 #ifdef IPV6_V6ONLY
-  int On = 0;
+  socklen_t On = 0;
   ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &On, sizeof(On));
   if (ret){
     LOG("ERROR", "IPV6_V6ONLY 设置失败.");
