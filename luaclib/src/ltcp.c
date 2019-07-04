@@ -16,12 +16,10 @@ void SETSOCKETOPT(int sockfd, int mode){
   int ret = 0;
 
 	/* 设置非阻塞 */
-  if (mode == SERVER) {
-    ret = non_blocking(sockfd);
-    if (ret) {
-      LOG("ERROR", "non_blocking 设置失败.");
-      return exit(-1);
-    }
+  ret = non_blocking(sockfd);
+  if (ret) {
+    LOG("ERROR", "non_blocking 设置失败.");
+    return exit(-1);
   }
 
 #ifdef SO_REUSEADDR
@@ -44,61 +42,11 @@ void SETSOCKETOPT(int sockfd, int mode){
   }
 #endif
 
-#ifdef TCP_NODELAY
-	/* 关闭小包延迟合并算法 */
-	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &Enable, sizeof(Enable));
-  if (ret){
-    LOG("ERROR", "TCP_NODELAY 设置失败.");
-    return exit(-1);
-  }
-#endif
-
 #ifdef IPV6_V6ONLY
   int On = 0;
   ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &On, sizeof(On));
   if (ret){
     LOG("ERROR", "IPV6_V6ONLY 设置失败.");
-    return exit(-1);
-  }
-#endif
-
-#ifdef TCP_DEFER_ACCEPT
-  if (mode == SERVER) {
-    /* 开启延迟Accept, 没数据来之前不回调accept */
-    ret = setsockopt(sockfd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &Enable, sizeof(Enable));
-    if (ret){
-      LOG("ERROR", "TCP_DEFER_ACCEPT 设置失败.");
-      return exit(-1);
-    }
-  }
-#endif
-
-#ifdef TCP_KEEPIDLE
-  /* 设置 TCP keepalive 空闲时间 */
-  int keepidle = 30;
-  ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle , sizeof(keepidle));
-  if (ret){
-    LOG("ERROR", "TCP_KEEPIDLE 设置失败.");
-    return exit(-1);
-  }
-#endif
-
-#ifdef TCP_KEEPCNT
-  /* 设置 TCP keepalive 探测总次数 */
-  int keepcount = 3;
-  ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, &keepcount , sizeof(keepcount));
-  if (ret){
-    LOG("ERROR", "TCP_KEEPCNT 设置失败.");
-    return exit(-1);
-  }
-#endif
-
-#ifdef TCP_KEEPINTVL
-  /* 设置 TCP keepalive 每次探测间隔时间 */
-  int keepinterval = 5;
-  ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &keepinterval , sizeof(keepinterval));
-  if (ret){
-    LOG("ERROR", "TCP_KEEPINTVL 设置失败.");
     return exit(-1);
   }
 #endif
