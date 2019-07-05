@@ -134,7 +134,7 @@ TCP_IO_CB(CORE_P_ core_io *io, int revents) {
 
 static void
 IO_CONNECT(CORE_P_ core_io *io, int revents){
-  errno = 0;
+  // errno = 0;
 
 	if (revents & EV_ERROR) {
 		LOG("ERROR", "Recevied a core_io object internal error from libev.");
@@ -144,8 +144,7 @@ IO_CONNECT(CORE_P_ core_io *io, int revents){
 	if (revents & EV_WRITE){
 		lua_State *co = (lua_State *)core_get_watcher_userdata(io);
 		if (lua_status(co) == LUA_YIELD || lua_status(co) == LUA_OK){
-			socklen_t len;
-			int CONNECTED = 0, err = 0;
+			int CONNECTED = 0, err = 0, len = sizeof(int);
 			if(getsockopt(io->fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0 && err == 0) CONNECTED = 1;
 			lua_pushboolean(co, CONNECTED);
 			int status = lua_resume(co, NULL, 1);
