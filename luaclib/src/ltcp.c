@@ -48,6 +48,15 @@ void SETSOCKETOPT(int sockfd, int mode){
   }
 #endif
 
+/* 关闭小包延迟合并算法 */
+#ifdef TCP_NODELAY
+	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &Enable, sizeof(Enable));
+  if (ret){
+    LOG("ERROR", "TCP_NODELAY 设置失败.");
+    return exit(-1);
+  }
+#endif
+
 }
 
 /* server fd */
