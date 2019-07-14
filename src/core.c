@@ -109,7 +109,7 @@ init_lua_libs(lua_State *L){
   lua_setfield(L, 1, "path");
 
 	/* 注入luaclib搜索路径 */
-  lua_pushliteral(L, "luaclib/msys-?.dll;luaclib/?.dll;./msys-?.dll;./?.dll");
+  lua_pushliteral(L, "luaclib/?.so;./?.so;luaclib/msys-?.dll;luaclib/?.dll;./msys-?.dll;./?.dll;");
   lua_setfield(L, 1, "cpath");
 
   lua_settop(L, 0);
