@@ -1,3 +1,6 @@
+# 清理文件
+rm -rf *.a
+
 # copy需要打包的文件
 cp ../3rd ./
 cp ../logs ./
