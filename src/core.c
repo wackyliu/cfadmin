@@ -113,8 +113,6 @@ init_lua_libs(lua_State *L){
   lua_settop(L, 0);
 }
 
-static lua_State *L;
-
 /* 注册需要忽略的信号 */
 core_signal sighup;
 core_signal sigpipe;
@@ -157,13 +155,12 @@ signal_init(){
 void
 init_main(){
 
-	int status;
-	L = lua_newstate(L_ALLOC, NULL);
+	int status = 0;
+
+	lua_State *L = lua_newstate(L_ALLOC, NULL);
 	if (!L) return ;
 
 	init_lua_libs(L);
-
-	status = luaL_loadfile(L, "script/main.lua");
 
 	// 停止GC
 	lua_gc(L, LUA_GCSTOP, 0);
@@ -174,22 +171,10 @@ init_main(){
 	// 设置 GC步进率倍率 = 控制垃圾收集器相对于内存分配速度的倍数; 默认为：200
 	// lua_gc(L, LUA_GCSETSTEPMUL, 200);
 
-	if(status != LUA_OK) {
-		switch(status){
-			case LUA_ERRFILE :
-				LOG("ERROR", "Can't find file or load file Error.");
-				exit(-1);
-			case LUA_ERRSYNTAX:
-				LOG("ERROR", lua_tostring(L, -1));
-				exit(-1);
-			case LUA_ERRMEM:
-				LOG("ERROR", "Memory Allocated faild.");
-				exit(-1);
-			case LUA_ERRGCMM:
-				LOG("ERROR", "An Error from lua GC Machine.");
-				exit(-1);
-		}
-		return ;
+	status = luaL_loadfile(L, "script/main.lua");
+	if (status > 1){
+		LOG("ERROR", lua_tostring(L, -1));
+		return lua_close(L), exit(-1);
 	}
 
 	status = lua_resume(L, NULL, 0);
