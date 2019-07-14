@@ -2,10 +2,10 @@
 rm -rf *.a
 
 # copy需要打包的文件
-cp ../3rd ./
-cp ../logs ./
-cp ../lualib ./
-cp ../script ./
+cp -R ../3rd ./
+cp -R ../logs ./
+cp -R ../lualib ./
+cp -R ../script ./
 
 mkdir luaclib && mv *.dll luaclib/ && mv luaclib/*core.dll ./
 
