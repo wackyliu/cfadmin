@@ -75,6 +75,14 @@ set(lpeg
   luaclib/src/lpeg/lpprint.c
 )
 
+set(lmsgpack
+  luaclib/src/lmsgpack/lmsgpack.c
+)
+
+set(lprotobuf
+  luaclib/src/lpbc/lpb.c
+)
+
 # ======== 编译核心库 ========
 ADD_LIBRARY(core SHARED ${CF_SRC_DIR})
 TARGET_LINK_LIBRARIES(core -lev -llua -ldl -lm)
@@ -110,6 +118,12 @@ target_link_libraries(lcrypt core)
 
 ADD_LIBRARY(lpeg SHARED ${lpeg})
 target_link_libraries(lpeg core)
+
+ADD_LIBRARY(lmsgpack SHARED ${lmsgpack})
+target_link_libraries(lmsgpack core)
+
+ADD_LIBRARY(lprotobuf SHARED ${lprotobuf})
+target_link_libraries(lprotobuf core)
 # ======== 编译第三方luaclib库 ========
 
 

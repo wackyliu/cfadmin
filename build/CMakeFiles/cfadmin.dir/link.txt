@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/cc -O3 -fPIC -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/cfadmin.dir/src/core_start.c.o  -o cfadmin  -L/usr/local/lib libcore.dylib -lev -llua -ldl -lm 
