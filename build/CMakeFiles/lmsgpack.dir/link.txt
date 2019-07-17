@@ -1,1 +1,0 @@
-/Library/Developer/CommandLineTools/usr/bin/cc -O3 -fPIC -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk -dynamiclib -Wl,-headerpad_max_install_names  -o liblmsgpack.dylib -install_name liblmsgpack.dylib CMakeFiles/lmsgpack.dir/luaclib/src/lmsgpack/lmsgpack.c.o  -L/usr/local/lib libcore.dylib -lev -llua -ldl -lm 

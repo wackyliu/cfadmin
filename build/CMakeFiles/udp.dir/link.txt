@@ -1,1 +1,0 @@
-/Library/Developer/CommandLineTools/usr/bin/cc -O3 -fPIC -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk -dynamiclib -Wl,-headerpad_max_install_names  -o libudp.dylib -install_name libudp.dylib CMakeFiles/udp.dir/luaclib/src/ludp.c.o  -L/usr/local/lib libcore.dylib -lev -llua -ldl -lm 

@@ -1,1 +1,0 @@
-/Library/Developer/CommandLineTools/usr/bin/cc -O3 -fPIC -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.14.sdk -dynamiclib -Wl,-headerpad_max_install_names  -o libtimer.dylib -install_name libtimer.dylib CMakeFiles/timer.dir/luaclib/src/ltimer.c.o  -L/usr/local/lib libcore.dylib -lev -llua -ldl -lm 
