@@ -49,11 +49,11 @@ void SETSOCKETOPT(int sockfd, int mode){
 
 /* 开启 TCP keepalive */
 #ifdef SO_KEEPALIVE
-  ret = setsockopt(sockfd, IPPROTO_TCP, SO_KEEPALIVE, &Enable , sizeof(Enable));
+/*  ret = setsockopt(sockfd, IPPROTO_TCP, SO_KEEPALIVE, &Enable , sizeof(Enable));
   if (ret){
     LOG("ERROR", "SO_KEEPALIVE 设置失败.");
     return exit(-1);
-  }
+  }*/
 #endif
 
 /* 开启延迟Accept, 没数据来之前不回调accept */
