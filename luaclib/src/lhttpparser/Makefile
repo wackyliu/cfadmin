@@ -9,8 +9,7 @@ default :
 
 CC = cc
 
-# 如果确认是intel的CPU并且有SSE4可以自行开启这个编译参数, 经过测试http解析速度至少快2倍
-# 这里为了兼容AMD CPU不作为默认开启选项
+# 开启请先确认是否支持指令集, 经过测试http解析速度至少快2倍
 # CFLAGS = -O3 -Wall -shared -fPIC -msse4
 
 INCLUDE = -I/usr/local/include
@@ -22,11 +21,11 @@ DLL = -lcore
 
 build:
 	$(CC) -o httpparser.so httpparser.c lhttpparser.c $(INCLUDE) $(LIB) $(CFLAGS) $(DLL)
-	mv httpparser.so ../../
+	mv *.so ../../
 
 rebuild:
 	$(CC) -o httpparser.so httpparser.c lhttpparser.c $(INCLUDE) $(LIB) $(CFLAGS) $(DLL)
-	mv httpparser.so ../../
+	mv *.so ../../
 
 clean:
 	rm -rf *.o *.so

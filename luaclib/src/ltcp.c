@@ -16,7 +16,7 @@ void SETSOCKETOPT(int sockfd, int mode){
   int ret = 0;
 
 	/* 设置非阻塞 */
-	non_blocking(sockfd);
+  non_blocking(sockfd);
 
 /* 地址重用 */
 #ifdef SO_REUSEADDR
@@ -38,21 +38,71 @@ void SETSOCKETOPT(int sockfd, int mode){
   }
 #endif
 
-/* 关闭IPv6 Only */
-#ifdef IPV6_V6ONLY
-  int On = 0;
-  ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &On, sizeof(On));
-  if (ret){
-    LOG("ERROR", "IPV6_V6ONLY 设置失败.");
-    return exit(-1);
-  }
-#endif
-
 /* 关闭小包延迟合并算法 */
 #ifdef TCP_NODELAY
 	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &Enable, sizeof(Enable));
   if (ret){
     LOG("ERROR", "TCP_NODELAY 设置失败.");
+    return exit(-1);
+  }
+#endif
+
+/* 开启 TCP keepalive */
+#ifdef SO_KEEPALIVE
+  ret = setsockopt(sockfd, IPPROTO_TCP, SO_KEEPALIVE, &Enable , sizeof(Enable));
+  if (ret){
+    LOG("ERROR", "SO_KEEPALIVE 设置失败.");
+    return exit(-1);
+  }
+#endif
+
+/* 开启延迟Accept, 没数据来之前不回调accept */
+#ifdef TCP_DEFER_ACCEPT
+  if (mode == SERVER) {
+    ret = setsockopt(sockfd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &Enable, sizeof(Enable));
+    if (ret){
+      LOG("ERROR", "TCP_DEFER_ACCEPT 设置失败.");
+      return exit(-1);
+    }
+  }
+#endif
+
+/* 设置 TCP keepalive 空闲时间 */
+#ifdef TCP_KEEPIDLE
+  int keepidle = 30;
+  ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle , sizeof(keepidle));
+  if (ret){
+    LOG("ERROR", "TCP_KEEPIDLE 设置失败.");
+    return exit(-1);
+  }
+#endif
+
+/* 设置 TCP keepalive 探测总次数 */
+#ifdef TCP_KEEPCNT
+  int keepcount = 3;
+  ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, &keepcount , sizeof(keepcount));
+  if (ret){
+    LOG("ERROR", "TCP_KEEPCNT 设置失败.");
+    return exit(-1);
+  }
+#endif
+
+/* 设置 TCP keepalive 每次探测间隔时间 */
+#ifdef TCP_KEEPINTVL
+  int keepinterval = 5;
+  ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &keepinterval , sizeof(keepinterval));
+  if (ret){
+    LOG("ERROR", "TCP_KEEPINTVL 设置失败.");
+    return exit(-1);
+  }
+#endif
+
+/* 开启IPV6与ipv4双栈 */
+#ifdef IPV6_V6ONLY
+  int No = 0;
+  ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&No, sizeof(No));
+  if (ret){
+    LOG("ERROR", "IPV6_V6ONLY 关闭失败.");
     return exit(-1);
   }
 #endif
@@ -105,7 +155,7 @@ create_client_fd(const char *ipaddr, int port){
 	SA.sin6_family = AF_INET6;
 	SA.sin6_port = htons(port);
 	int error = inet_pton(AF_INET6, ipaddr, &SA.sin6_addr);
-  if (0 >= error) {
+  if (1 != error) {
 		LOG("ERROR", strerror(errno));
 		close(sockfd);
 		return -1;
@@ -113,7 +163,6 @@ create_client_fd(const char *ipaddr, int port){
 
 	int ret = connect(sockfd, (struct sockaddr*)&SA, sizeof(SA));
   if (ret < 0 && errno != EINPROGRESS){
-		LOG("ERROR", strerror(errno));
 		close(sockfd);
 		return -1;
   }
@@ -124,8 +173,6 @@ create_client_fd(const char *ipaddr, int port){
 static void
 TCP_IO_CB(CORE_P_ core_io *io, int revents) {
 
-	int status = 0;
-
 	if (revents & EV_ERROR) {
 		LOG("ERROR", "Recevied a core_io object internal error from libev.");
 		return ;
@@ -133,7 +180,7 @@ TCP_IO_CB(CORE_P_ core_io *io, int revents) {
 
 	lua_State *co = (lua_State *)core_get_watcher_userdata(io);
 	if (lua_status(co) == LUA_YIELD || lua_status(co) == LUA_OK){
-		status = lua_resume(co, NULL, 0);
+		int status = CO_RESUME(co, NULL, 0);
 		if (status != LUA_YIELD && status != LUA_OK){
 			LOG("ERROR", lua_tostring(co, -1));
 			core_io_stop(CORE_LOOP_ io);
@@ -143,7 +190,6 @@ TCP_IO_CB(CORE_P_ core_io *io, int revents) {
 
 static void
 IO_CONNECT(CORE_P_ core_io *io, int revents){
-  // errno = 0;
 
 	if (revents & EV_ERROR) {
 		LOG("ERROR", "Recevied a core_io object internal error from libev.");
@@ -155,9 +201,9 @@ IO_CONNECT(CORE_P_ core_io *io, int revents){
 		if (lua_status(co) == LUA_YIELD || lua_status(co) == LUA_OK){
 			int CONNECTED = 0, err = 0;
       socklen_t len = sizeof(socklen_t);
-			if(getsockopt(io->fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0 && err == 0) CONNECTED = 1;
+			if(getsockopt(io->fd, SOL_SOCKET, SO_ERROR, &err, (socklen_t*)&len) == 0 && err == 0) CONNECTED = 1;
 			lua_pushboolean(co, CONNECTED);
-			int status = lua_resume(co, NULL, 1);
+			int status = CO_RESUME(co, NULL, 1);
 			if (status != LUA_YIELD && status != LUA_OK){
 				LOG("ERROR", lua_tostring(co, -1));
 				core_io_stop(CORE_LOOP_ io);
@@ -178,7 +224,7 @@ IO_ACCEPT(CORE_P_ core_io *io, int revents){
       memset(&SA, 0x0, slen);
 			int client = accept(io->fd, (struct sockaddr*)&SA, &slen);
 			if (0 >= client) {
-				if (errno != EAGAIN)
+				if (errno != EWOULDBLOCK)
 					LOG("INFO", strerror(errno));
 				return ;
 			}
@@ -189,7 +235,7 @@ IO_ACCEPT(CORE_P_ core_io *io, int revents){
 				inet_ntop(AF_INET6, &SA.sin6_addr, buf, INET6_ADDRSTRLEN);
 				lua_pushinteger(co, client);
 				lua_pushlstring(co, buf, strlen(buf));
-				int status = lua_resume(co, NULL, lua_status(co) == LUA_YIELD ? lua_gettop(co) : lua_gettop(co) - 1);
+				int status = CO_RESUME(co, NULL, lua_status(co) == LUA_YIELD ? lua_gettop(co) : lua_gettop(co) - 1);
 				if (status != LUA_YIELD && status != LUA_OK) {
 					LOG("ERROR", lua_tostring(co, -1));
 					LOG("ERROR", "Error Lua Accept Method");
@@ -285,7 +331,7 @@ tcp_write(lua_State *L){
 
 		if (wsize < 0){
 			if (errno == EINTR) continue;
-			if (errno == EAGAIN){ lua_pushinteger(L, 0); return 1;}
+			if (errno == EWOULDBLOCK){ lua_pushinteger(L, 0); return 1;}
 		}
 
 	} while (0);

@@ -54,7 +54,7 @@ udp_socket_new(const char *ipaddr, int port){
 	SA.sin6_family = AF_INET6;
 	SA.sin6_port = htons(port);
 	int error = inet_pton(AF_INET6, ipaddr, &SA.sin6_addr);
-	if (0 >= error) {
+	if (1 != error) {
 		LOG("ERROR", strerror(errno));
 		close(sockfd);
 		return -1;
@@ -82,7 +82,7 @@ UDP_IO_CB(CORE_P_ core_io *io, int revents){
 	if (revents & EV_READ){
 		lua_State *co = (lua_State *)core_get_watcher_userdata(io);
 		if (lua_status(co) == LUA_YIELD || lua_status(co) == LUA_OK){
-			status = lua_resume(co, NULL, lua_gettop(co) > 0 ? lua_gettop(co) - 1 : 0);
+			status = CO_RESUME(co, NULL, lua_gettop(co) > 0 ? lua_gettop(co) - 1 : 0);
 			if (status != LUA_YIELD && status != LUA_OK){
 				LOG("ERROR", lua_tostring(co, -1));
 			}

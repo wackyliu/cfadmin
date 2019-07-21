@@ -16,13 +16,15 @@ DLL = -lcore
 INCLUDE = -I/usr/local/include
 LIB = -L/usr/local/lib -L../ -L../../../
 
+FILES = lcrypt.c crc.c md5.c url.c sha1.c sha2.c
+
 build:
-	$(CC) -o lcrypt.so lcrypt.c crc.c md5.c sha1.c sha2.c $(INCLUDE) $(LIB) $(CFLAGS) $(DLL)
-	mv lcrypt.so ../../
+	$(CC) -o lcrypt.so $(FILES) $(INCLUDE) $(LIB) $(CFLAGS) $(DLL)
+	mv *.so ../../
 
 rebuild:
-	$(CC) -o lcrypt.so lcrypt.c crc.c md5.c sha1.c sha2.c $(INCLUDE) $(LIB) $(CFLAGS) $(DLL)
-	mv lcrypt.so ../../
+	$(CC) -o lcrypt.so $(FILES) $(INCLUDE) $(LIB) $(CFLAGS) $(DLL)
+	mv *.so ../../
 
 clean:
 	rm -rf *.o *.so

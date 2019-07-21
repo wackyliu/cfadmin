@@ -1,5 +1,5 @@
 #include "core.h"
-
+/*
 const char *signame[]= {
 	"INVALID",
 	"SIGHUP",
@@ -37,6 +37,7 @@ const char *signame[]= {
 };
 
 #define signum_to_string(number) (signame[number])
+*/
 
 static void // 忽略信号
 SIG_IGNORE(core_loop *loop, core_signal *signal, int revents){
@@ -59,10 +60,6 @@ ERROR_CB(const char *msg){
 static void *
 EV_ALLOC(void *ptr, long nsize){
 	// 为libev内存hook注入日志;
-	if (ptr && 0 > nsize){
-		LOG("ERROR", "attemp to pass a negative number to malloc or free")
-		return NULL;
-	}
 	if (nsize == 0) return xfree(ptr), NULL;
 	for (;;) {
 		void *newptr = xrealloc(ptr, nsize);
@@ -164,14 +161,7 @@ init_main(){
 
 	init_lua_libs(L);
 
-	// 停止GC
-	lua_gc(L, LUA_GCSTOP, 0);
-
-	// 设置 GC间歇率 = 每次开启一次新的GC所需的等待时间与条件; 默认为：200
-	// lua_gc(L, LUA_GCSETPAUSE, 200);
-
-	// 设置 GC步进率倍率 = 控制垃圾收集器相对于内存分配速度的倍数; 默认为：200
-	// lua_gc(L, LUA_GCSETSTEPMUL, 200);
+	CO_GCRESET(L);
 
 	status = luaL_loadfile(L, "script/main.lua");
 	if (status > 1){
@@ -179,7 +169,7 @@ init_main(){
 		return lua_close(L), exit(-1);
 	}
 
-	status = lua_resume(L, NULL, 0);
+	status = CO_RESUME(L, NULL, 0);
 	if (status > 1){
 		LOG("ERROR", lua_tostring(L, -1));
 		return lua_close(L), exit(-1);
@@ -187,8 +177,7 @@ init_main(){
 	if (status == LUA_YIELD) {
 		signal_init();
 	}
-	/* 重启GC */
-	lua_gc(L, LUA_GCRESTART, 0);
+
 }
 
 void
