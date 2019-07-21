@@ -62,6 +62,7 @@ set(lcjson
 set(lcrypt
   luaclib/src/lcrypt/crc.c
   luaclib/src/lcrypt/md5.c
+  luaclib/src/lcrypt/url.c
   luaclib/src/lcrypt/sha1.c
   luaclib/src/lcrypt/sha2.c
   luaclib/src/lcrypt/lcrypt.c
