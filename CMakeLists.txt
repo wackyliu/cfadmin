@@ -1,8 +1,11 @@
-# 项目名称
-PROJECT(cfadmin C)
+# 警告
+set(CMAKE_LEGACY_CYGWIN_WIN32 0)
 
 # CMAKE最小版本号
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+cmake_minimun_required(VERSION 2.8)
+
+# 项目名称
+PROJECT(cfadmin C)
 
 # 添加头文件查找路径
 include_directories(/usr/include)
@@ -11,9 +14,6 @@ include_directories(/usr/local/include)
 # 添加库文件查找路径
 link_directories(/usr/lib)
 link_directories(/usr/local/lib)
-
-# 警告
-set(CMAKE_LEGACY_CYGWIN_WIN32 0)
 
 # 设置CFLAGS
 set(CMAKE_C_FLAGS "-O3 -fPIC")
