@@ -1,5 +1,5 @@
 # 清理文件
-rm -rf *.a
+rm -rf *.a *make* *Make*
 
 # copy需要打包的文件
 cp -R ../3rd ./
