@@ -23,12 +23,7 @@ set(CMAKE_C_FLAGS "-O3 -fPIC -Wno-dev")
 set(MAIN src/core_start.c)
 
 # 核心文件
-set(CF_SRC_DIR
-  src/core_sys.c
-  src/core_ev.c
-  src/core_memory.c
-  src/core.c
-)
+set(CF_SRC_DIR src/core_sys.c src/core_ev.c src/core_memory.c src/core.c)
 
 set(MAIN src/core_start.c)
 
@@ -40,45 +35,14 @@ set(CF_LUACLIB_TASK luaclib/src/ltask.c)
 set(CF_LUACLIB_SYS luaclib/src/lsys.c)
 
 # luaclib库文件 (第三方)
-set(httpparser
-  luaclib/src/lhttpparser/httpparser.c
-  luaclib/src/lhttpparser/lhttpparser.c
-)
+aux_source_directory(luaclib/src/lfs lfs)
+aux_source_directory(luaclib/src/lpeg lpeg)
+aux_source_directory(luaclib/src/lcrypt lcrypt)
+aux_source_directory(luaclib/src/lcjson lcjson)
+aux_source_directory(luaclib/src/lpbc lprotobuf)
+aux_source_directory(luaclib/src/lmsgpack lmsgpack)
+aux_source_directory(luaclib/src/lhttpparser httpparser)
 
-set(lcjson
-  luaclib/src/lcjson/fpconv.c
-  luaclib/src/lcjson/strbuf.c
-  luaclib/src/lcjson/lua_cjson.c
-)
-
-set(lcrypt
-  luaclib/src/lcrypt/crc.c
-  luaclib/src/lcrypt/md5.c
-  luaclib/src/lcrypt/url.c
-  luaclib/src/lcrypt/sha1.c
-  luaclib/src/lcrypt/sha2.c
-  luaclib/src/lcrypt/lcrypt.c
-)
-
-set(lpeg
-  luaclib/src/lpeg/lpvm.c
-  luaclib/src/lpeg/lpcap.c
-  luaclib/src/lpeg/lptree.c
-  luaclib/src/lpeg/lpcode.c
-  luaclib/src/lpeg/lpprint.c
-)
-
-set(lfs
-  luaclib/src/lfs/lfs.c
-)
-
-set(lmsgpack
-  luaclib/src/lmsgpack/lmsgpack.c
-)
-
-set(lprotobuf
-  luaclib/src/lpbc/lpb.c
-)
 
 # ======== 编译核心库 ========
 ADD_LIBRARY(core SHARED ${CF_SRC_DIR})
