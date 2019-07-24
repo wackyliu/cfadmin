@@ -1,4 +1,5 @@
-# 警告
+# 忽略BUILD目录的rpath与win32警告
+set(CMAKE_SKIP_BUILD_RPATH true)
 set(CMAKE_LEGACY_CYGWIN_WIN32 0)
 
 # CMAKE最小版本号
@@ -16,15 +17,10 @@ link_directories(/usr/lib)
 link_directories(/usr/local/lib)
 
 # 设置CFLAGS
-set(CMAKE_C_FLAGS "-O3 -fPIC")
-
-# 忽略BUILD目录的rpath
-set(CMAKE_SKIP_BUILD_RPATH true)
+set(CMAKE_C_FLAGS "-O3 -fPIC -Wno-dev")
 
 # 执行文件
-set(MAIN
-  src/core_start.c
-)
+set(MAIN src/core_start.c)
 
 # 核心文件
 set(CF_SRC_DIR
@@ -103,6 +99,7 @@ target_link_libraries(sys core)
 # ======== 编译内置luaclib库 ========
 
 
+
 # ======== 编译第三方luaclib库 ========
 ADD_LIBRARY(httpparser SHARED ${httpparser})
 target_link_libraries(httpparser core)
@@ -129,8 +126,8 @@ add_executable(${PROJECT_NAME} ${MAIN})
 target_link_libraries(${PROJECT_NAME} core)
 # ======== 编译内置cfadmin ========
 
-install (TARGETS ${PROJECT_NAME} core httpparser cjson lcrypt lpeg tcp udp timer task sys
-  RUNTIME DESTINATION "${PROJECT_SOURCE_DIR}"
-  LIBRARY DESTINATION "${PROJECT_SOURCE_DIR}/luaclib"
-  ARCHIVE DESTINATION "${PROJECT_SOURCE_DIR}"
-)
+
+# ========== 说明 ========== #
+# 此文件用于作者编译Win版本cfadmin.
+# 不提供安装文档与其它技术支持.
+# ======================== #
