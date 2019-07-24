@@ -12,12 +12,8 @@ include_directories(/usr/local/include)
 link_directories(/usr/lib)
 link_directories(/usr/local/lib)
 
-# 奇怪的错误
-#set(CMAKE_MACOSX_RPATH 1)
-#set(CMAKE_SKIP_RPATH 1)
-#set(SKIP_BUILD_RPATH 1)
-#set(CMAKE_SKIP_BUILD_RPATH 1)
-#set(CMAKE_SKIP_INSTALL_RPATH 1)
+# 警告
+set(CMAKE_LEGACY_CYGWIN_WIN32 0)
 
 # 设置CFLAGS
 set(CMAKE_C_FLAGS "-O3 -fPIC")
@@ -131,7 +127,7 @@ target_link_libraries(lprotobuf core)
 # ======== 编译内置cfadmin ========
 add_executable(${PROJECT_NAME} ${MAIN})
 target_link_libraries(${PROJECT_NAME} core)
-# ======== 编译内置luaclib库 ========
+# ======== 编译内置cfadmin ========
 
 install (TARGETS ${PROJECT_NAME} core httpparser cjson lcrypt lpeg tcp udp timer task sys
   RUNTIME DESTINATION "${PROJECT_SOURCE_DIR}"
