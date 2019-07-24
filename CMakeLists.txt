@@ -68,7 +68,7 @@ set(lpeg
   luaclib/src/lpeg/lpprint.c
 )
 
-set(lmsgpack
+set(lfs
   luaclib/src/lfs/lfs.c
 )
 
