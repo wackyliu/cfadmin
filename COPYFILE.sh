@@ -6,6 +6,7 @@ cp -R ../3rd ./
 cp -R ../logs ./
 cp -R ../lualib ./
 cp -R ../script ./
+cp -R ../static ./
 
 mkdir luaclib && mv *.dll luaclib/ && mv luaclib/*core.dll ./
 
