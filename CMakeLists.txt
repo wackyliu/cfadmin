@@ -69,6 +69,10 @@ set(lpeg
 )
 
 set(lmsgpack
+  luaclib/src/lfs/lfs.c
+)
+
+set(lmsgpack
   luaclib/src/lmsgpack/lmsgpack.c
 )
 
@@ -118,6 +122,9 @@ target_link_libraries(lmsgpack core)
 
 ADD_LIBRARY(lprotobuf SHARED ${lprotobuf})
 target_link_libraries(lprotobuf core)
+
+ADD_LIBRARY(lfs SHARED ${lfs})
+target_link_libraries(lfs core)
 # ======== 编译第三方luaclib库 ========
 
 
