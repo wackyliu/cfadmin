@@ -36,7 +36,7 @@ set(CF_LUACLIB_SYS luaclib/src/lsys.c)
 
 # luaclib库文件 (第三方)
 aux_source_directory(luaclib/src/lfs lfs)
-aux_source_directory(luaclib/src/lffi lffi)
+#aux_source_directory(luaclib/src/lffi lffi)
 aux_source_directory(luaclib/src/lpeg lpeg)
 aux_source_directory(luaclib/src/lcrypt lcrypt)
 aux_source_directory(luaclib/src/lcjson lcjson)
@@ -91,8 +91,8 @@ target_link_libraries(lprotobuf core)
 ADD_LIBRARY(lfs SHARED ${lfs})
 target_link_libraries(lfs core)
 
-ADD_LIBRARY(lffi SHARED ${lffi})
-target_link_libraries(lffi core)
+#ADD_LIBRARY(lffi SHARED ${lffi})
+#target_link_libraries(lffi core)
 # ======== 编译第三方luaclib库 ========
 
 
