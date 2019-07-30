@@ -40,6 +40,7 @@ extern "C" {
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
+#include <complex.h>
 #endif
 
 #ifndef NDEBUG
