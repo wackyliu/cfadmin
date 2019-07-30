@@ -40,7 +40,10 @@ extern "C" {
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
-#include <complex.h>
+#ifndef HAVE_COMPLEX
+  #define HAVE_COMPLEX
+  #include <complex.h>
+#endif
 #endif
 
 #ifndef NDEBUG
