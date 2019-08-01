@@ -152,18 +152,24 @@ function system.user_response (content)
       return json_encode({code = 400, data = null, msg = '4. 用户已存在'})
     end
     args.password = crypt.hexencode(crypt.sha1(args.password))
-    user.user_add(db, args)
+    local ok = user.user_add(db, args)
+    if not ok then
+      return json_encode({code = 401, msg = "5. 添加用户失败"})
+    end
     return json_encode({code = 0, msg = "添加成功"})
   end
   -- 删除用户
   if action == 'delete' then
-    local uid = toint(args.uid)
+    local uid = toint(args.id)
     if not uid then
-      return json_encode({code = 400, data = null, msg = '1. 未知的uid'})
+      return json_encode({code = 400, data = null, msg = '1. 未知的用户ID'})
+    end
+    if exists.uid == uid then
+      return json_encode({code = 401, data = null, msg = "2. 不能删除当前用户"})
     end
     local exists = user.user_exists(db, nil, uid)
     if not exists then
-      return json_encode({code = 400, data = null, msg = '2. 试图删除不存在的用户'})
+      return json_encode({code = 403, data = null, msg = '3. 试图删除不存在的用户'})
     end
     user.user_delete(db, uid)
     user_token.token_delete(db, uid) -- 清除Token
@@ -194,7 +200,10 @@ function system.user_response (content)
     end
     args.email = url_decode(args.email)
     args.password = crypt.hexencode(crypt.sha1(url_decode(args.password)))
-    user.user_update(db, args)
+    local ok = user.user_update(db, args)
+    if not ok then
+      return json_encode({code = 401, msg = "5. 更新用户信息失败"})
+    end
     user_token.token_delete(db, args.id) -- 清除Token
     return json_encode({code = 0, msg = "SUCCESS"})
   end

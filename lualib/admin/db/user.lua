@@ -34,7 +34,7 @@ end
 
 -- 用户是否存在
 function user.user_exists (db, username, uid)
-  return db:query(fmt([[
+  local user, err = db:query(fmt([[
   SELECT
     `cfadmin_users`.id,
     `cfadmin_users`.name,
@@ -44,7 +44,11 @@ function user.user_exists (db, username, uid)
   WHERE
     `cfadmin_users`.active = '1' AND `cfadmin_users`.username = '%s' OR `cfadmin_users`.id = '%s'
   LIMIT 1]],
-  tostring(username), toint(uid)))[1]
+  tostring(username), toint(uid)))
+  if not user then
+    return
+  end
+  return user[1]
 end
 
 -- 用户名或者登录名是否存在
@@ -100,12 +104,12 @@ end
 
 -- 更新用户密码
 function user.user_update_password (db, opt)
-  return db:query(fmt([[UPDATE cfadmin_users SET password = '%s' WHERE id = '%s' AND active = '1']], opt.password, opt.id))
+  return db:query(fmt([[UPDATE cfadmin_users SET password = '%s', update_at = '%s' WHERE id = '%s' AND active = '1']], opt.password, os_time(), opt.id))
 end
 
 -- 更新用户信息
 function user.user_update_info (db, opt)
-  return db:query(fmt([[UPDATE cfadmin_users SET name = '%s', phone = '%s', email = '%s' WHERE id = '%s' AND active = '1']], opt.name, opt.phone, opt.email, opt.id))
+  return db:query(fmt([[UPDATE cfadmin_users SET name = '%s', phone = '%s', email = '%s', update_at = '%s' WHERE id = '%s' AND active = '1']], opt.name, opt.phone, opt.email, os_time(), opt.id))
 end
 
 return user
