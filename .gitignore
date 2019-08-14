@@ -48,6 +48,10 @@
 
 # Code Edit
 .vscode
+*.la
+*.lai
+src/ev*.h
+src/l*.h
 cfadmin
 
 # Kernel Module Compile Results
