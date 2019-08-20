@@ -27,6 +27,34 @@ function user.user_list (db, opt)
   ]], limit * (page - 1), limit))
 end
 
+-- 模糊查找用户列表
+function user.find_by_username (db, opt)
+  local limit = toint(opt.limit) or 10
+  local page = toint(opt.page) or 1
+  local condition
+  if opt.condition == 'id' or opt.condition == 'email' or opt.condition == 'phone' then
+    condition = fmt("`cfadmin_users`.`%s` = '%s'", opt.condition, opt.value)
+  else
+    condition = fmt("`cfadmin_users`.`%s` LIKE '%%%s%%'", opt.condition, opt.value)
+  end
+  return db:query(fmt([[
+  SELECT
+    `cfadmin_users`.id,
+    `cfadmin_users`.name,
+    `cfadmin_users`.username,
+    `cfadmin_roles`.name AS role_name,
+    `cfadmin_users`.email,
+    `cfadmin_users`.phone,
+    `cfadmin_users`.create_at,
+    `cfadmin_users`.update_at,
+    `cfadmin_users`.active
+  FROM cfadmin_users, cfadmin_roles
+  WHERE
+    `cfadmin_roles`.id = `cfadmin_users`.role AND `cfadmin_users`.active = 1 AND %s
+   ORDER BY `cfadmin_users`.id LIMIT %s, %s
+  ]], condition, limit * (page - 1), limit))
+end
+
 -- 用户总数
 function user.user_count (db)
   return db:query([[SELECT count(id) AS count FROM cfadmin_users WHERE active = '1']])[1]['count']
@@ -34,6 +62,14 @@ end
 
 -- 用户是否存在
 function user.user_exists (db, username, uid)
+  local condition
+  if username then
+    condition = fmt([[`cfadmin_users`.username = '%s']], username)
+  elseif uid then
+    condition = fmt([[`cfadmin_users`.id = '%s']], uid)
+  else
+    return
+  end
   local user, err = db:query(fmt([[
   SELECT
     `cfadmin_users`.id,
@@ -42,11 +78,10 @@ function user.user_exists (db, username, uid)
     `cfadmin_users`.password
   FROM cfadmin_users
   WHERE
-    `cfadmin_users`.active = '1' AND `cfadmin_users`.username = '%s' OR `cfadmin_users`.id = '%s'
-  LIMIT 1]],
-  tostring(username), toint(uid)))
+    `cfadmin_users`.active = '1' AND %s
+  LIMIT 1]], condition))
   if not user then
-    return
+    return nil, err
   end
   return user[1]
 end
