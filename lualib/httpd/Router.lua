@@ -1,6 +1,9 @@
 local log = require "logging"
 local Log = log:new({dump = true, path = 'httpd-Router'})
 
+local url = require "url"
+local url_decode = url.decode
+
 local new_tab = require("sys").new_tab
 
 local math = math
@@ -105,8 +108,8 @@ local function find_route (method, path)
 	if not prefix and not type then
 		return
 	end
-	-- 非GET方法不查找静态文件
-	if method ~= 'GET' then
+	-- 非GET/HEAD方法不查找静态文件
+	if method ~= 'GET' and method ~= 'HEAD' then
 		return
 	end
 	-- 凡是找到'../'并且检查路径回退已经超出静态文件根目录返回404
@@ -114,13 +117,15 @@ local function find_route (method, path)
 		return
 	end
 	load_file = load_file or function (path)
-		local f, error = io_open(prefix..path, 'rb')
+		local filepath = prefix..url_decode(path)
+		-- 使用r+测试是否可读可写; 如果filepath是目录则无法被打开, 但单独的r模式可以.
+		local f, error = io_open(filepath, 'r+')
 		if not f then
 			return
 		end
-		local file = f:read('*a')
+		local body_len = f:seek("end")
 		f:close()
-		return file, match(path, '.+%.([%a]+)')
+		return body_len, filepath, match(path, '.+%.([%a]+)')
 	end
 	return load_file, type
 end
