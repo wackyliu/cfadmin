@@ -71,4 +71,12 @@ function utils.role_already_selected (permissions, id)
   return false
 end
 
+-- 消除<标签>内容
+function utils.escape_script (str)
+  if type(str) == 'string' then
+    str = str:gsub('<[^><]*>', '')
+  end
+  return str
+end
+
 return utils
