@@ -212,11 +212,11 @@ end
 local function build_get_req (opt)
   local request = {
     fmt("GET %s HTTP/1.1", opt.path),
-    fmt("Host: %s", opt.domain..':'..opt.port),
+    fmt("Host: %s", (opt.port == 80 or opt.port == 443) and opt.domain or opt.domain..':'..opt.port),
     'Accept: */*',
-    'Accept-encoding: identity',
+    'Accept-Encoding: identity',
     fmt("Connection: keep-alive"),
-    fmt("User-agent: %s", opt.server),
+    fmt("User-Agent: %s", opt.server),
   }
   if type(opt.args) == "table" then
     local args = {}
@@ -228,7 +228,7 @@ local function build_get_req (opt)
   end
   if type(opt.headers) == "table" then
     for _, header in ipairs(opt.headers) do
-      assert(lower(header[1]) ~= 'content-length', "please don't give Content-Length")
+      assert(lower(header[1]) ~= 'Content-Length', "please don't give Content-Length")
       assert(#header == 2, "HEADER need key[1]->value[2] (2 values)")
       insert(request, header[1]..': '..header[2])
     end
@@ -240,16 +240,16 @@ end
 local function build_post_req (opt)
   local request = {
 		fmt("POST %s HTTP/1.1\r\n", opt.path),
-		fmt("Host: %s\r\n", opt.domain..':'..opt.port),
+		fmt("Host: %s\r\n", (opt.port == 80 or opt.port == 443) and opt.domain or opt.domain..':'..opt.port),
 		'Accept: */*\r\n',
-		'Accept-encoding: identity\r\n',
+		'Accept-Encoding: identity\r\n',
 		'Connection: keep-alive\r\n',
-		fmt("User-agent: %s\r\n", opt.server),
+		fmt("User-Agent: %s\r\n", opt.server),
 		'Content-Type: application/x-www-form-urlencoded\r\n',
 	}
 	if type(opt.headers) == "table" then
 		for _, header in ipairs(opt.headers) do
-			assert(lower(header[1]) ~= 'content-length', "please don't give Content-Length")
+			assert(lower(header[1]) ~= 'Content-Length', "please don't give Content-Length")
 			assert(#header == 2, "HEADER need key[1]->value[2] (2 values)")
 			insert(request, header[1]..': '..header[2]..CRLF)
 		end
@@ -262,29 +262,51 @@ local function build_post_req (opt)
 			insert(body, url_encode(b[1])..'='..url_encode(b[2]))
 		end
 		insert(request, concat(body, "&"))
-		insert(request, #request - 2, fmt("Content-length: %s\r\n", #request[#request]))
+		insert(request, #request - 2, fmt("Content-Length: %s\r\n", #request[#request]))
 	end
 	if type(opt.body) == "string" then
-		insert(request, #request, fmt("Content-length: %s\r\n", #opt.body))
+		insert(request, #request, fmt("Content-Length: %s\r\n", #opt.body))
 		insert(request, opt.body)
 	end
   return concat(request)
 end
 
+local function build_delete_req (opt)
+  local request = {
+    fmt("DELETE %s HTTP/1.1", opt.path),
+    fmt("Host: %s", (opt.port == 80 or opt.port == 443) and opt.domain or opt.domain..':'..opt.port),
+    fmt("User-Agent: %s", opt.server),
+    'Accept: */*',
+    'Accept-Encoding: identity',
+    "Connection: keep-alive",
+  }
+  if type(opt.headers) == "table" then
+		for _, header in ipairs(opt.headers) do
+			assert(lower(header[1]) ~= 'Content-Length', "please don't give Content-Length")
+			assert(#header == 2, "HEADER need key[1]->value[2] (2 values)")
+			insert(request, header[1]..': '..header[2])
+		end
+    if opt.body then
+      insert(request, fmt("Content-Length: %s", #opt.body))
+    end
+	end
+  return concat(request, CRLF) .. CRLF2 .. ( opt.body or '' )
+end
+
 local function build_json_req (opt)
   local request = {
 		fmt("POST %s HTTP/1.1", opt.path),
-		fmt("Host: %s", opt.domain..':'..opt.port),
+		fmt("Host: %s", (opt.port == 80 or opt.port == 443) and opt.domain or opt.domain..':'..opt.port),
 		'Accept: */*',
-		'Accept-encoding: identity',
+		'Accept-Encoding: identity',
 		"Connection: keep-alive",
-		fmt("User-agent: %s", opt.server),
-		fmt("Content-length: %s", #opt.json),
+		fmt("User-Agent: %s", opt.server),
+		fmt("Content-Length: %s", #opt.json),
 		'Content-Type: application/json',
 	}
 	if type(opt.headers) == "table" then
 		for _, header in ipairs(opt.headers) do
-			assert(lower(header[1]) ~= 'content-length', "please don't give Content-Length")
+			assert(lower(header[1]) ~= 'Content-Length', "please don't give Content-Length")
 			assert(#header == 2, "HEADER need key[1]->value[2] (2 values)")
 			insert(request, header[1]..': '..header[2])
 		end
@@ -296,7 +318,7 @@ end
 local function build_file_req (opt)
   local request = {
     fmt("POST %s HTTP/1.1\r\n", opt.path),
-    fmt("Host: %s\r\n", opt.domain..':'..opt.port),
+    fmt("Host: %s\r\n", (opt.port == 80 or opt.port == 443) and opt.domain or opt.domain..':'..opt.port),
     'Accept: */*\r\n',
     'Accept-Encoding: identity\r\n',
     fmt("Connection: keep-alive\r\n"),
@@ -305,7 +327,7 @@ local function build_file_req (opt)
 
   if type(opt.headers) == "table" then
     for _, header in ipairs(opt.headers) do
-      assert(lower(header[1]) ~= 'content-length', "please don't give Content-Length")
+      assert(lower(header[1]) ~= 'Content-Length', "please don't give Content-Length")
       assert(#header == 2, "HEADER need key[1]->value[2] (2 values)")
       insert(request, header[1]..': '..header[2]..'\r\n')
     end
@@ -328,13 +350,33 @@ local function build_file_req (opt)
       insert(body, file.file)
     end
     body = concat(body, CRLF)
-    insert(request, fmt("Content-length: %s\r\n", #body + 2 + #boundary_end))
+    insert(request, fmt("Content-Length: %s\r\n", #body + 2 + #boundary_end))
     insert(request, CRLF)
     insert(request, body)
     insert(request, CRLF)
     insert(request, boundary_end)
   end
   return concat(request)
+end
+
+local function build_put_req (opt)
+  local request = {
+    fmt("PUT %s HTTP/1.1", opt.path),
+    fmt("Host: %s", (opt.port == 80 or opt.port == 443) and opt.domain or opt.domain..':'..opt.port),
+    'Accept: */*',
+    'Accept-Encoding: identity',
+    fmt("Connection: keep-alive"),
+    fmt("Content-Length: %s", #opt.body),
+    fmt("User-Agent: %s", opt.server),
+  }
+  if type(opt.headers) == "table" then
+    for _, header in ipairs(opt.headers) do
+      assert(lower(header[1]) ~= 'Content-Length', "please don't give Content-Length")
+      assert(#header == 2, "HEADER need key[1]->value[2] (2 values)")
+      insert(request, header[1]..': '..header[2])
+    end
+  end
+  return concat(request, CRLF) .. CRLF2 .. ( opt.body or '' )
 end
 
 return {
@@ -348,4 +390,6 @@ return {
   build_post_req = build_post_req,
   build_json_req = build_json_req,
   build_file_req = build_file_req,
+  build_put_req = build_put_req,
+  build_delete_req = build_delete_req,
 }
