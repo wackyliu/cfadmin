@@ -18,6 +18,8 @@ link_directories(/usr/local/lib)
 
 # 设置CFLAGS
 set(CMAKE_C_FLAGS "-O3 -fPIC -Wno-dev")
+#set(CMAKE_C_FLAGS "-O3 -fPIC -Wno-dev -DJEMALLOC")
+#set(CMAKE_C_FLAGS "-O3 -fPIC -Wno-dev -DTCMALLOC")
 
 # 执行文件
 set(MAIN src/core_start.c)
