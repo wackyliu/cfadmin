@@ -5,8 +5,9 @@
 #include <openssl/crypto.h>
 #include "../../src/core.h"
 
-#define SERVER 0
-#define CLIENT 1
+#define None (-1)
+#define SERVER (0)
+#define CLIENT (1)
 
 static inline
 void SETSOCKETOPT(int sockfd, int mode){
@@ -43,15 +44,6 @@ void SETSOCKETOPT(int sockfd, int mode){
   ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &Enable, sizeof(Enable));
   if (ret){
     LOG("ERROR", "TCP_NODELAY 设置失败.");
-    return _exit(-1);
-  }
-#endif
-
-/* 开启 TCP keepalive */
-#ifdef SO_KEEPALIVE
-  ret = setsockopt(sockfd, IPPROTO_TCP, SO_KEEPALIVE, &Enable , sizeof(Enable));
-  if (ret){
-    LOG("ERROR", "SO_KEEPALIVE 设置失败.");
     return _exit(-1);
   }
 #endif
@@ -99,7 +91,7 @@ void SETSOCKETOPT(int sockfd, int mode){
 
 /* 开启IPV6与ipv4双栈 */
 #ifdef IPV6_V6ONLY
-  if (mode == SERVER) {
+  if (mode == SERVER || mode == CLIENT) {
     int No = 0;
     ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&No, sizeof(No));
     if (ret){
@@ -238,7 +230,7 @@ IO_ACCEPT(CORE_P_ core_io *io, int revents){
           LOG("INFO", strerror(errno));
         return ;
       }
-      SETSOCKETOPT(client, CLIENT);
+      SETSOCKETOPT(client, None);
       lua_State *co = (lua_State *) core_get_watcher_userdata(io);
       if (lua_status(co) == LUA_YIELD || lua_status(co) == LUA_OK){
         char buf[INET6_ADDRSTRLEN];
