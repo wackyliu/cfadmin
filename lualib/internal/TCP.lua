@@ -1,5 +1,7 @@
 local class = require "class"
 
+local new_tab = require("sys").new_tab
+
 local log = require "logging"
 local Log = log:new({ dump = true, path = 'internal-TCP' })
 
@@ -33,16 +35,18 @@ local tcp_sslread = tcp.ssl_read
 local tcp_write = tcp.write
 local tcp_ssl_write = tcp.ssl_write
 local tcp_listen = tcp.listen
+local tcp_listen_ex = tcp.listen_ex
 local tcp_sendfile = tcp.sendfile
 
 local tcp_new_client_fd = tcp.new_client_fd
 local tcp_new_server_fd = tcp.new_server_fd
+local tcp_new_unixsock_fd = tcp.new_unixsock_fd
 
 
 local EVENT_READ  = 0x01
 local EVENT_WRITE = 0x02
 
-local POOL = {}
+local POOL = new_tab(1 << 10, 0)
 local function tcp_pop()
   if #POOL > 0 then
       return remove(POOL)
@@ -269,20 +273,43 @@ function TCP:ssl_recv(bytes)
 end
 
 function TCP:listen(ip, port, cb)
-    self.LISTEN_IO = tcp_pop()
-    self.fd = tcp_new_server_fd(ip, port, self._backlog)
-    if not self.fd then
-        return nil, "Listen port failed. Please check if the port is already occupied."
+  self.LISTEN_IO = tcp_pop()
+  self.fd = tcp_new_server_fd(ip, port, self._backlog or 128)
+  if not self.fd then
+    return nil, "Listen port failed. Please check if the port is already occupied."
+  end
+  if type(cb) ~= 'function' then
+    return nil, "Listen_ex function was invalid."
+  end
+  self.listen_co = co_new(function (fd, ipaddr)
+    while 1 do
+      if fd and ipaddr then
+        co_spwan(cb, fd, ipaddr)
+        fd, ipaddr = co_wait()
+      end
     end
-    self.co = co_new(function (fd, ipaddr)
-        while 1 do
-            if fd and ipaddr then
-                co_spwan(cb, fd, ipaddr)
-                fd, ipaddr = co_wait()
-            end
-        end
-    end)
-    return true, tcp_listen(self.LISTEN_IO, self.fd, self.co)
+  end)
+  return true, tcp_listen(self.LISTEN_IO, self.fd, self.listen_co)
+end
+
+function TCP:listen_ex(unix_domain_path, removed, cb)
+  self.LISTEN_EX_IO = tcp_pop()
+  self.ufd = tcp_new_unixsock_fd(unix_domain_path, removed or true, self._backlog or 128)
+  if not self.ufd then
+    return nil, "Listen_ex unix domain socket failed. Please check the domain_path was exists and access."
+  end
+  if type(cb) ~= 'function' then
+    return nil, "Listen_ex function was invalid."
+  end
+  self.listen_ex_co = co_new(function (fd)
+    while 1 do
+      if fd then
+        co_spwan(cb, fd, "127.0.0.1")
+        fd = co_wait()
+      end
+    end
+  end)
+  return true, tcp_listen_ex(self.LISTEN_EX_IO, self.ufd, self.listen_ex_co)
 end
 
 function TCP:connect(domain, port)
@@ -380,67 +407,72 @@ end
 
 function TCP:close()
 
-    if self.timer then
-        self.timer:stop()
-        self.timer = nil
-    end
+  if self.timer then
+    self.timer:stop()
+    self.timer = nil
+  end
 
-    if self.READ_IO then
-        tcp_stop(self.READ_IO)
-        tcp_push(self.READ_IO)
-        self.READ_IO = nil
-        self.read_co = nil
-    end
+  if self.READ_IO then
+    tcp_stop(self.READ_IO)
+    tcp_push(self.READ_IO)
+    self.READ_IO = nil
+    self.read_co = nil
+  end
 
-    if self.SEND_IO then
-        tcp_stop(self.SEND_IO)
-        tcp_push(self.SEND_IO)
-        self.SEND_IO = nil
-        self.send_co = nil
-        self.sendfile_co = nil
-    end
+  if self.SEND_IO then
+    tcp_stop(self.SEND_IO)
+    tcp_push(self.SEND_IO)
+    self.SEND_IO = nil
+    self.send_co = nil
+    self.sendfile_co = nil
+  end
 
-    if self.CONNECT_IO then
-        tcp_stop(self.CONNECT_IO)
-        tcp_push(self.CONNECT_IO)
-        self.CONNECT_IO = nil
-        self.connect_co = nil
-    end
+  if self.CONNECT_IO then
+    tcp_stop(self.CONNECT_IO)
+    tcp_push(self.CONNECT_IO)
+    self.CONNECT_IO = nil
+    self.connect_co = nil
+  end
 
-    if self.connect_current_co then
-        co_wakeup(self.connect_current_co)
-        self.connect_current_co = nil
-    end
+  if self.connect_current_co then
+    co_wakeup(self.connect_current_co)
+    self.connect_current_co = nil
+  end
 
-    if self.send_current_co then
-        co_wakeup(self.send_current_co)
-        self.send_current_co = nil
-    end
+  if self.send_current_co then
+    co_wakeup(self.send_current_co)
+    self.send_current_co = nil
+  end
 
-    if self.read_current_co then
-        co_wakeup(self.read_current_co)
-        self.read_current_co = nil
-    end
+  if self.read_current_co then
+    co_wakeup(self.read_current_co)
+    self.read_current_co = nil
+  end
 
-    if self.sendfile_current_co then
-      co_wakeup(self.sendfile_current_co)
-      self.sendfile_current_co = nil
-    end
+  if self.sendfile_current_co then
+  co_wakeup(self.sendfile_current_co)
+  self.sendfile_current_co = nil
+  end
 
-    if self._timeout then
-        self._timeout = nil
-    end
+  if self._timeout then
+    self._timeout = nil
+  end
 
-    if self.ssl and self.ssl_ctx then
-        tcp_free_ssl(self.ssl_ctx, self.ssl)
-        self.ssl_ctx = nil
-        self.ssl = nil
-    end
+  if self.ssl and self.ssl_ctx then
+    tcp_free_ssl(self.ssl_ctx, self.ssl)
+    self.ssl_ctx = nil
+    self.ssl = nil
+  end
 
-    if self.fd then
-        tcp_close(self.fd)
-        self.fd = nil
-    end
+  if self.fd then
+    tcp_close(self.fd)
+    self.fd = nil
+  end
+
+  if self.ufd then
+    tcp_close(self.ufd)
+    self.fd = nil
+  end
 
 end
 

@@ -8,7 +8,6 @@ local http = {}
 	如果使用者在函数内直接写入状态码, 请确保您非常清楚before函数的实现.
 --]]
 
-
 -- 成功
 function http.ok()
 	return 200

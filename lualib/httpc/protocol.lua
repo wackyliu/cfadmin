@@ -1,12 +1,18 @@
 local tcp = require "internal.TCP"
 
-local url = require "url"
-local url_encode = url.encode
+local json = require "json"
+local json_encode = json.encode
 
-local HTTP = require "protocol.http"
-local FILEMIME = HTTP.FILEMIME
-local PARSER_HTTP_RESPONSE = HTTP.PARSER_HTTP_RESPONSE
-local RESPONSE_CHUNKED_PARSER = HTTP.RESPONSE_CHUNKED_PARSER
+local crypt = require "crypt"
+local url_encode = crypt.urlencode
+local hmac_sha256 = crypt.hmac_sha256
+local base64encode = crypt.base64encode
+local base64urlencode = crypt.base64urlencode
+
+local HTTP_PARSER = require "protocol.http.parser"
+local FILEMIME = require "protocol.http.mime"
+local PARSER_HTTP_RESPONSE = HTTP_PARSER.PARSER_HTTP_RESPONSE
+local RESPONSE_CHUNKED_PARSER = HTTP_PARSER.RESPONSE_CHUNKED_PARSER
 
 local type = type
 local assert = assert
@@ -136,7 +142,7 @@ local function httpc_response(sock, SSL)
 	local content = {}
 	local times = 0
 	while 1 do
-		local data, len = sock_recv(sock, SSL, 2048)
+		local data, len = sock_recv(sock, SSL, 65535)
 		if not data then
 			return nil, SSL.." A peer of remote server close this connection."
 		end
@@ -163,7 +169,7 @@ local function httpc_response(sock, SSL)
 				local content = {split(DATA, posB + 1, #DATA)}
         local Len = #content[1]
 				while 1 do
-					local data, len = sock_recv(sock, SSL, 2048)
+					local data, len = sock_recv(sock, SSL, 65535)
 					if not data then
 						return nil, SSL.."[Content_Length] A peer of remote server close this connection."
 					end
@@ -189,7 +195,7 @@ local function httpc_response(sock, SSL)
           insert(content, buf)
 				end
 				while 1 do
-					local data, len = sock_recv(sock, SSL, 2048)
+					local data, len = sock_recv(sock, SSL, 65535)
 					if not data then
 						return CODE, SSL.."[chunked] A peer of remote server close this connection A."
 					end
@@ -355,7 +361,7 @@ local function build_file_req (opt)
           filename = ''
         end
         insert(body, fmt(cd, fmt('name="%s"', name) .. '; ' .. fmt('filename="%s"', filename)))
-        insert(body, fmt(ct, FILEMIME(file.type or '') or 'application/octet-stream') .. CRLF)
+        insert(body, fmt(ct, FILEMIME[file.type or ''] or 'application/octet-stream') .. CRLF)
       end
       insert(body, file.file)
     end
@@ -389,6 +395,24 @@ local function build_put_req (opt)
   return concat(request, CRLF) .. CRLF2 .. ( type(opt.body) == "string" and opt.body or '' )
 end
 
+-- http base authorization
+local function build_basic_authorization(username, password)
+  return "Authorization", "Basic " .. base64encode(username .. ":" .. password)
+end
+
+-- Json Web Token
+local function build_jwt(secret, payload)
+  local content = {nil, nil, nil}
+  -- header
+  content[#content + 1] = base64urlencode(json_encode{ alg = "HS256", typ = "JWT" })
+  -- payload
+  content[#content + 1] = base64urlencode(payload)
+  -- signature
+  content[#content + 1] = hmac_sha256(secret, concat(content, "."), true)
+  -- result.
+  return "Authorization", "Bearer " .. concat(content, ".")
+end
+
 return {
   sock_new = sock_new,
   sock_recv = sock_recv,
@@ -402,4 +426,6 @@ return {
   build_file_req = build_file_req,
   build_put_req = build_put_req,
   build_delete_req = build_delete_req,
+  build_jwt = build_jwt,
+  build_basic_authorization = build_basic_authorization,
 }
