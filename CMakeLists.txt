@@ -95,7 +95,7 @@ ADD_LIBRARY(lfs SHARED ${lfs})
 target_link_libraries(lfs core)
 
 ADD_LIBRARY(lz SHARED ${lz})
-target_link_libraries(lz core)
+target_link_libraries(lz z core)
 # ======== 编译第三方luaclib库 ========
 
 
