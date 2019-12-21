@@ -21,6 +21,7 @@ local FILE_TYPE = form.FILE
 local ARGS_TYPE = form.ARGS
 local form_multipart = form.multipart
 local form_urlencode = form.urlencode
+local form_argsencode = form.get_args
 
 local Cookie = require "httpd.Cookie"
 local clCookie = Cookie.clean   -- 清理
@@ -115,7 +116,7 @@ local function PASER_METHOD(http, sock, max_body_size, buffer, METHOD, PATH, HEA
   if METHOD == "GET" then
     local spl_pos = find(PATH, '%?')
     if spl_pos and spl_pos < #PATH then
-      content['args'] = form_urlencode(PATH)
+      content['args'] = form_argsencode(PATH)
     end
   elseif METHOD == "POST" or METHOD == "PUT" then
     local body_len = toint(HEADER['Content-Length']) or toint(HEADER['Content-length'])
@@ -478,8 +479,11 @@ function HTTP_PROTOCOL.EVENT_DISPATCH(fd, ipaddr, http)
         end
         local accept_encoding = HEADER['Accept-Encoding']
         if enable_gzip and accept_encoding and find(accept_encoding, "gzip") then
-          header[#header+1] = 'Content-Encoding: gzip'
-          body = gzcompress(body)
+          local compress_body = gzcompress(body)
+          if compress_body then
+            header[#header+1] = 'Content-Encoding: gzip'
+            body = compress_body
+          end
         end
         header[#header+1] = 'Content-Length: ' .. #body
         header[#header+1] = 'Cache-Control: no-cache, no-store, must-revalidate'

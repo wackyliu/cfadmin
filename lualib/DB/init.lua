@@ -35,31 +35,30 @@ local function DB_CREATE (opt)
   local times = 1
   local db
   while 1 do
-      db = mysql:new()
-      db:set_timeout(3)
-      local connect, err = db:connect(opt)
-      if connect then
-        break
+    db = mysql:new()
+    db:set_timeout(3)
+    local connect, err = db:connect(opt)
+    if connect then
+      assert(db:query(fmt('SET wait_timeout=%s', WAIT_TIMEOUT)), "SET wait_timeout faild.")
+      assert(db:query(fmt('SET interactive_timeout=%s', WAIT_TIMEOUT)), "SET interactive_timeout faild.")
+      if opt.stmts then
+        for rkey, stmt in pairs(opt.stmts) do
+          assert(db:query(stmt), "["..stmt.."] 预编译失败.")
+        end
       end
-      Log:WARN('第'..tostring(times)..'次连接失败:'..err.." 3 秒后尝试再次连接")
-      db:close()
-      times = times + 1
-      timer.sleep(3)
-  end
-  if not opt.INITIALIZATION then -- 设置连接超时时间
-    db:query(fmt('SET GLOBAL wait_timeout=%s', WAIT_TIMEOUT))
-    db:query(fmt('SET GLOBAL interactive_timeout=%s', WAIT_TIMEOUT))
-  end
-  if opt.stmts then
-    for rkey, stmt in pairs(opt.stmts) do
-      assert(db:query(stmt), "["..stmt.."] 预编译失败.")
+      db:set_timeout(0)
+      break
     end
+    Log:WARN('第'..tostring(times)..'次连接失败:'..err.." 3 秒后尝试再次连接")
+    db:close()
+    times = times + 1
+    timer.sleep(3)
   end
   return db
 end
 
 local function add_wait(self, co)
-  insert(self.co_pool, 1, co)
+  insert(self.co_pool, co)
 end
 
 local function pop_wait(self)
@@ -67,7 +66,7 @@ local function pop_wait(self)
 end
 
 local function add_db(self, db)
-  insert(self.db_pool, 1, db)
+  insert(self.db_pool, db)
 end
 
 -- 负责创建连接/加入等待队列

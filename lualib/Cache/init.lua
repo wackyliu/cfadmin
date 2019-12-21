@@ -47,27 +47,29 @@ local function CREATE_CACHE(opt)
   local rds
   while 1 do
       rds = redis:new(opt)
+      rds:set_timeout(3)
       local ok, err = rds:connect()
       if ok then
-          break
+        if not opt.INITIALIZATION then
+          local ok, ret = rds:cmd("CONFIG", "GET", "TIMEOUT")
+          if ret[2] ~= '0' then
+            assert(rds:cmd("CONFIG SET", "TIMEOUT", "0"), "SET TIMEOUT faild.")
+          end
+        end
+        rds:set_timeout(0)
+        break
       end
       Log:WARN('第'..tostring(times)..'次连接失败:'..err.." 3 秒后尝试再次连接")
       rds:close()
       times = times + 1
       timer.sleep(3)
   end
-  if not opt.INITIALIZATION then
-    local ok, ret = rds:cmd("CONFIG", "GET", "TIMEOUT")
-    if ret[2] ~= '0' then
-      rds:cmd("CONFIG SET", "TIMEOUT", "0")
-    end
-  end
   return rds
 end
 
 -- 加入到连接池内
 local function add_cache(self, cache)
-  insert(self.cache_pool, 1, cache)
+  insert(self.cache_pool, cache)
 end
 
 -- 从连接池内取出一个cache对象
@@ -85,7 +87,7 @@ end
 
 -- 加入到协程池内
 local function add_wait(self, co)
-  insert(self.co_pool, 1, co)
+  insert(self.co_pool, co)
 end
 
 -- 弹出一个等待协程
