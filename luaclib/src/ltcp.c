@@ -23,7 +23,7 @@ void SETSOCKETOPT(int sockfd, int mode){
 #ifdef SO_REUSEADDR
   ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &Enable, sizeof(Enable));
   if (ret) {
-    LOG("ERROR", "设置 SO_REUSEADDR 失败.");
+    LOG("ERROR", "Setting SO_REUSEADDR failed.");
     return _exit(-1);
   }
 #endif
@@ -33,7 +33,7 @@ void SETSOCKETOPT(int sockfd, int mode){
   if (mode == SERVER) {
     ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &Enable, sizeof(Enable));
     if (ret) {
-      LOG("ERROR", "设置 SO_REUSEPORT 失败.");
+      LOG("ERROR", "Setting SO_REUSEPORT failed.");
       return _exit(-1);
     }
   }
@@ -43,8 +43,19 @@ void SETSOCKETOPT(int sockfd, int mode){
 #ifdef TCP_NODELAY
   ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &Enable, sizeof(Enable));
   if (ret){
-    LOG("ERROR", "TCP_NODELAY 设置失败.");
+    LOG("ERROR", "Setting TCP_NODELAY failed.");
     return _exit(-1);
+  }
+#endif
+
+/* 开启 TCP keepalive */
+#ifdef SO_KEEPALIVE
+  if (mode != None){
+    ret = setsockopt(sockfd, IPPROTO_TCP, SO_KEEPALIVE, &Enable , sizeof(Enable));
+    if (ret){
+      LOG("ERROR", "Setting SO_KEEPALIVE failed.");
+      return _exit(-1);
+    }
   }
 #endif
 
@@ -53,7 +64,7 @@ void SETSOCKETOPT(int sockfd, int mode){
   if (mode == SERVER) {
     ret = setsockopt(sockfd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &Enable, sizeof(Enable));
     if (ret){
-      LOG("ERROR", "TCP_DEFER_ACCEPT 设置失败.");
+      LOG("ERROR", "Setting TCP_DEFER_ACCEPT failed.");
       return _exit(-1);
     }
   }
@@ -64,7 +75,7 @@ void SETSOCKETOPT(int sockfd, int mode){
   int keepidle = 30;
   ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle , sizeof(keepidle));
   if (ret){
-    LOG("ERROR", "TCP_KEEPIDLE 设置失败.");
+    LOG("ERROR", "Setting TCP_KEEPIDLE failed.");
     return _exit(-1);
   }
 #endif
@@ -74,7 +85,7 @@ void SETSOCKETOPT(int sockfd, int mode){
   int keepcount = 3;
   ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, &keepcount , sizeof(keepcount));
   if (ret){
-    LOG("ERROR", "TCP_KEEPCNT 设置失败.");
+    LOG("ERROR", "Setting TCP_KEEPCNT failed.");
     return _exit(-1);
   }
 #endif
@@ -84,7 +95,7 @@ void SETSOCKETOPT(int sockfd, int mode){
   int keepinterval = 5;
   ret = setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &keepinterval , sizeof(keepinterval));
   if (ret){
-    LOG("ERROR", "TCP_KEEPINTVL 设置失败.");
+    LOG("ERROR", "Setting TCP_KEEPINTVL failed.");
     return _exit(-1);
   }
 #endif
@@ -95,7 +106,7 @@ void SETSOCKETOPT(int sockfd, int mode){
     int No = 0;
     ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&No, sizeof(No));
     if (ret){
-      LOG("ERROR", "IPV6_V6ONLY 设置失败.");
+      LOG("ERROR", "Setting IPV6_V6ONLY failed.");
       return _exit(-1);
     }
   }
@@ -147,7 +158,7 @@ create_client_fd(const char *ipaddr, int port){
 	/* 建立 TCP Client Socket */
 	int sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
 	if (0 >= sockfd) {
-    LOG("DEBUG", strerror(errno));
+    LOG("ERROR", strerror(errno));
     return -1;
   }
 
@@ -180,7 +191,7 @@ create_unixsock_fd(const char* path, size_t path_len, int backlog) {
   errno = 0;
   int sockfd = socket(AF_LOCAL, SOCK_STREAM, IPPROTO_IP);
   if (0 >= sockfd){
-    LOG("DEBUG", strerror(errno));
+    LOG("ERROR", strerror(errno));
     return -1;
   } 
 
@@ -195,7 +206,7 @@ create_unixsock_fd(const char* path, size_t path_len, int backlog) {
   /* 绑定套接字失败 */
   int bind_success = bind(sockfd, (struct sockaddr *)&UN, sizeof(UN));
   if (0 > bind_success) {
-    LOG("DEBUG", strerror(errno));
+    LOG("ERROR", strerror(errno));
     close(sockfd);
     return -1;
   }
@@ -203,7 +214,7 @@ create_unixsock_fd(const char* path, size_t path_len, int backlog) {
   /* 监听套接字失败 */
   int listen_success = listen(sockfd, backlog);
   if (0 > listen_success) {
-    LOG("DEBUG", strerror(errno));
+    LOG("ERROR", strerror(errno));
     close(sockfd);
     return -1;
   }
@@ -272,7 +283,7 @@ IO_ACCEPT(CORE_P_ core_io *io, int revents){
       int client = accept(io->fd, (struct sockaddr*)&SA, &slen);
       if (0 >= client) {
         if (errno != EWOULDBLOCK)
-          LOG("INFO", strerror(errno));
+          LOG("ERROR", strerror(errno));
         return ;
       }
       SETSOCKETOPT(client, None);
@@ -492,26 +503,28 @@ tcp_write(lua_State *L){
 
 	errno = 0;
 
-	int fd = lua_tointeger(L, 1);
-	if (0 >= fd) return 0;
+  size_t resp_len = 0;
 
-	const char *response = lua_tostring(L, 2);
-	if (!response) return 0;
+  int fd = lua_tointeger(L, 1);
 
-	int resp_len = lua_tointeger(L, 3);
+  const char *response = luaL_checklstring(L, 2, &resp_len);
+  if (!response)
+    return luaL_error(L, "tcp_write ERROR: attempt to write an empty string.");
 
-	do {
+  int offset = lua_tointeger(L, 3);
 
-		int wsize = write(fd, response, resp_len);
+  do {
 
-		if (wsize > 0) { lua_pushinteger(L, wsize); return 1; }
+   int wsize = write(fd, response + offset, resp_len - offset);
 
-		if (wsize < 0){
-			if (errno == EINTR) continue;
-			if (errno == EWOULDBLOCK){ lua_pushinteger(L, 0); return 1;}
-		}
+   if (wsize > 0) { lua_pushinteger(L, wsize); return 1; }
 
-	} while (0);
+   if (wsize < 0){
+     if (errno == EINTR) continue;
+     if (errno == EWOULDBLOCK){ lua_pushinteger(L, 0); return 1;}
+   }
+
+  } while (0);
 
 	return 0;
 }
@@ -520,10 +533,12 @@ static int
 tcp_sslwrite(lua_State *L){
 
 	SSL *ssl = lua_touserdata(L, 1);
-	if (!ssl) return 0;
+	if (!ssl)
+    return 0;
 
 	const char *response = lua_tostring(L, 2);
-	if (!response) return 0;
+	if (!response)
+    return luaL_error(L, "tcp_sslwrite ERROR: attempt to write an empty string.");
 
 	int resp_len = lua_tointeger(L, 3);
 
@@ -796,8 +811,8 @@ luaopen_tcp(lua_State *L){
   SSL_library_init();
   SSL_load_error_strings();
   // ERR_load_crypto_strings();
-  // CRYPTO_set_mem_functions(xmalloc, xrealloc, xfree);
   // OpenSSL_add_ssl_algorithms();
+  CRYPTO_set_mem_functions(xmalloc, xrealloc, xfree);
   /* 添加SSL支持 */
   luaL_newmetatable(L, "__TCP__");
   lua_pushstring (L, "__index");
