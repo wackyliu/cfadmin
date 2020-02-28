@@ -16,6 +16,10 @@ include_directories(/usr/local/include)
 link_directories(/usr/lib)
 link_directories(/usr/local/lib)
 
+# 添加依赖库
+find_package(OpenSSL REQUIRED)
+find_package(ZLIB REQUIRED)
+
 # 设置CFLAGS
 set(CMAKE_C_FLAGS "-O3 -fPIC -Wno-dev")
 #set(CMAKE_C_FLAGS "-O3 -fPIC -Wno-dev -DJEMALLOC")
