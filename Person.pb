@@ -1,19 +1,14 @@
-syntax = "proto3";
 
-message Person
-{
-  message Hand
-  {
-    string left  = 1;
-    string right = 2;
-  }
-  message Foot
-  {
-    string left  = 1;
-    string right = 2;
-  }
-  string name = 1;
-  uint32 age  = 2;
-  Hand hand = 3;
-  Foot foot = 4;
-}
+ï
+Person.proto"Ö
+Person
+name (	Rname
+age (Rage 
+hand (2.Person.HandRhand 
+foot (2.Person.FootRfoot0
+Hand
+left (	Rleft
+right (	Rright0
+Foot
+left (	Rleft
+right (	Rrightbproto3
