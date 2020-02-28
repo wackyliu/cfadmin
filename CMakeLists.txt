@@ -80,7 +80,7 @@ ADD_LIBRARY(cjson SHARED ${lcjson})
 target_link_libraries(cjson core)
 
 ADD_LIBRARY(lcrypt SHARED ${lcrypt})
-target_link_libraries(lcrypt core)
+target_link_libraries(lcrypt core crypto)
 
 ADD_LIBRARY(lpeg SHARED ${lpeg})
 target_link_libraries(lpeg core)
