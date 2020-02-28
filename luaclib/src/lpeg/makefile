@@ -14,12 +14,5 @@ CFLAGS = -O3 -shared -fPIC
 DLL = -lcore -llua
 
 build:
-	$(CC) -o lpeg.so lpcap.c lpcode.c lpprint.c lptree.c lpvm.c $(CFLAGS) $(INCLUDES) $(LIBS) $(DLL)
-	mv *.so ../../
-
-rebuild:
-	$(CC) -o lpeg.so lpcap.c lpcode.c lpprint.c lptree.c lpvm.c $(CFLAGS) $(INCLUDES) $(LIBS) $(DLL)
-	mv *.so ../../
-
-clean:
-	rm -f *.so *.o
+	@$(CC) -o lpeg.so lpcap.c lpcode.c lpprint.c lptree.c lpvm.c $(CFLAGS) $(INCLUDES) $(LIBS) $(DLL)
+	@mv *.so ../../
