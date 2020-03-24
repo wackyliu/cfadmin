@@ -10,16 +10,11 @@ project(cfadmin C)
 
 # 添加头文件查找路径
 include_directories(src)
-include_directories(./)
-include_directories(../)
-include_directories(/usr/include)
-include_directories(/usr/local/include)
+include_directories(/usr/include /usr/local/include)
+include_directories()
 
 # 添加库文件查找路径
-link_directories(./)
-link_directories(../)
-link_directories(/usr/lib)
-link_directories(/usr/local/lib)
+link_directories(/usr/lib /usr/local/lib)
 
 # 添加依赖库
 find_package(OpenSSL REQUIRED)
