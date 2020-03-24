@@ -40,7 +40,7 @@ set(CF_LUACLIB_TIMER luaclib/src/ltimer.c)
 set(CF_LUACLIB_TASK luaclib/src/ltask.c)
 set(CF_LUACLIB_SYS luaclib/src/lsys.c)
 set(CF_LUACLIB_AIO luaclib/src/laio.c)
-set(CF_LUACLIB_TCP luaclib/src/laio.c)
+set(CF_LUACLIB_TCP luaclib/src/ltcp.c)
 
 # luaclib库文件 (第三方)
 aux_source_directory(luaclib/src/lz lz)
@@ -75,7 +75,7 @@ target_link_libraries(task core)
 ADD_LIBRARY(sys SHARED ${CF_LUACLIB_SYS})
 target_link_libraries(sys core)
 
-ADD_LIBRARY(laio SHARED ${CF_LUACLIB_SYS})
+ADD_LIBRARY(laio SHARED ${CF_LUACLIB_AIO})
 target_link_libraries(laio core eio)
 # ======== 编译内置luaclib库 ========
 
