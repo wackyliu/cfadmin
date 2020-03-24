@@ -9,10 +9,15 @@ cmake_minimum_required(VERSION 2.6)
 project(cfadmin C)
 
 # 添加头文件查找路径
+include_directories(src)
+include_directories(./)
+include_directories(../)
 include_directories(/usr/include)
 include_directories(/usr/local/include)
 
 # 添加库文件查找路径
+link_directories(./)
+link_directories(../)
 link_directories(/usr/lib)
 link_directories(/usr/local/lib)
 
@@ -39,6 +44,8 @@ set(CF_LUACLIB_UDP luaclib/src/ludp.c)
 set(CF_LUACLIB_TIMER luaclib/src/ltimer.c)
 set(CF_LUACLIB_TASK luaclib/src/ltask.c)
 set(CF_LUACLIB_SYS luaclib/src/lsys.c)
+set(CF_LUACLIB_AIO luaclib/src/laio.c)
+set(CF_LUACLIB_TCP luaclib/src/laio.c)
 
 # luaclib库文件 (第三方)
 aux_source_directory(luaclib/src/lz lz)
@@ -72,6 +79,9 @@ target_link_libraries(task core)
 
 ADD_LIBRARY(sys SHARED ${CF_LUACLIB_SYS})
 target_link_libraries(sys core)
+
+ADD_LIBRARY(laio SHARED ${CF_LUACLIB_SYS})
+target_link_libraries(laio core eio)
 # ======== 编译内置luaclib库 ========
 
 
