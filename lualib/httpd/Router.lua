@@ -42,14 +42,16 @@ local static = {} -- 静态文件路由
 local function hex_route(route)
 	local tab = new_tab(32, 0)
 	for r in splite(route, '/([^ /%?]+)') do
-		tab[#tab + 1] = r
+    if r ~= '' then
+		  tab[#tab + 1] = r
+    end
 	end
 	return tab
 end
 
 -- 主要用作分割hash路由查找
 local function to_route(route)
-	return spliter(route, slash, '')
+	return spliter(route, "([/]+)", '/')
 end
 
 -- 检查是路径回退是否超出静态文件根目录

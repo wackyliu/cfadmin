@@ -387,7 +387,7 @@ int phr_parse_request(const char *buf_start, size_t len, const char **method, si
 {
     const char *buf = buf_start, *buf_end = buf_start + len;
     size_t max_headers = *num_headers;
-    int r;
+    int r = 0;
 
     *method = NULL;
     *method_len = 0;
@@ -447,7 +447,7 @@ int phr_parse_response(const char *buf_start, size_t len, int *minor_version, in
 {
     const char *buf = buf_start, *buf_end = buf + len;
     size_t max_headers = *num_headers;
-    int r;
+    int r = 0;
 
     *minor_version = -1;
     *status = 0;
@@ -472,7 +472,7 @@ int phr_parse_headers(const char *buf_start, size_t len, struct phr_header *head
 {
     const char *buf = buf_start, *buf_end = buf + len;
     size_t max_headers = *num_headers;
-    int r;
+    int r = 0;
 
     *num_headers = 0;
 

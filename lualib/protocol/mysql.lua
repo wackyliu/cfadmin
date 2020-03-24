@@ -13,6 +13,8 @@ local sha1= crypt.sha1
 local setmetatable = setmetatable
 local error = error
 local tonumber = tonumber
+local concat = table.concat
+
 local new_tab = require("sys").new_tab
 
 local CHARSET_MAP = {
@@ -146,11 +148,26 @@ local function _send_packet(self, req, size)
     return sock:send(packet)
 end
 
+local function sock_recv(sock, byte)
+    local buffers = new_tab(32, 0)
+    while 1 do
+      local buf = sock:recv(byte)
+      if not buf then
+        return nil, "MySQL Server closed."
+      end
+      buffers[#buffers+1] = buf
+      byte = byte - #buf
+      if byte == 0 then
+        return concat(buffers)
+      end
+    end
+end
+
 
 local function _recv_packet(self)
     local sock = self.sock
 
-    local data, err = sock:recv(4) -- packet header
+    local data, err = sock_recv(sock, 4) -- packet header
     if not data then
         self.state = nil
         return nil, nil, "failed to receive packet header: "..(err or "nil")
@@ -166,9 +183,9 @@ local function _recv_packet(self)
         return nil, nil, "empty packet"
     end
 
-    if len > self._max_packet_size then
-        return nil, nil, "packet size too big: " .. len
-    end
+    -- if len > self._max_packet_size then
+    --     return nil, nil, "packet size too big: " .. len
+    -- end
 
     local num = strbyte(data, pos)
 
@@ -176,7 +193,7 @@ local function _recv_packet(self)
 
     self.packet_no = num
 
-    data, err = sock:recv(len)
+    data, err = sock_recv(sock, len)
 
     --print("receive returned")
 
@@ -185,9 +202,7 @@ local function _recv_packet(self)
         return nil, nil, "failed to read packet content: "..(err or "nil")
     end
 
-    local field_count = strbyte(data, 1)
-
-    local typ
+    local field_count, typ = strbyte(data, 1)
     if field_count == 0x00 then
         typ = "OK"
     elseif field_count == 0xff then
@@ -415,7 +430,7 @@ function MySQL.connect(self, opts)
 
     local max_packet_size = opts.max_packet_size
     if not max_packet_size then
-        max_packet_size = 4 * 1024 * 1024 -- default 4 MB
+        max_packet_size = 16 * 1024 * 1024 -- default 4 MB
     end
     self._max_packet_size = max_packet_size
 
@@ -663,6 +678,23 @@ function MySQL.query(self, query, est_nrows)
     end
   end
   -- return self:read_result(est_nrows)
+end
+
+local escape_map = {
+    ['\0'] = "\\0",
+    ['\b'] = "\\b",
+    ['\n'] = "\\n",
+    ['\r'] = "\\r",
+    ['\t'] = "\\t",
+    ['\26'] = "\\Z",
+    ['\\'] = "\\\\",
+    ["'"] = "\\'",
+    ['"'] = '\\"',
+}
+
+-- 转义
+function MySQL.quote_sql_str( str )
+    return strformat("%s", strgsub(str, "[\0\b\n\r\t\26\\\'\"]", escape_map))
 end
 
 function MySQL.set_compact_arrays(self, value)

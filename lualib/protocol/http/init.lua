@@ -14,6 +14,7 @@ local new_tab = require("sys").new_tab
 local insert = table.insert
 
 local lz = require "lz"
+local decompress = lz.compress
 local gzcompress = lz.gzcompress
 
 local form = require "httpd.Form"
@@ -240,12 +241,25 @@ local function Switch_Protocol(http, cls, sock, header, method, version, path, i
   if protocol then -- 仅支持协议回传
     response[#response+1] = "Sec-Websocket-Protocol: "..tostring(protocol)
   end
+  local ext = nil
+  local extension = header['Sec-WebSocket-Extensions']
+  if type(extension) == 'string' and extension ~= '' then
+    if find(header['Sec-WebSocket-Extensions'], "permessage%-deflate") then
+      response[#response+1] = "Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits=15; server_no_context_takeover; client_no_context_takeover"
+      ext = "deflate"
+    elseif find(header['Sec-WebSocket-Extensions'], "x%-webkit%-deflate%-frame") then
+      response[#response+1] = "Sec-WebSocket-Extensions: x-webkit-deflate-frame; no_context_takeover"
+      ext = "deflate"
+    end
+  end
+  -- require "utils"
+  -- var_dump(header)
   http:tolog(101, path, header['X-Real-IP'] or ip, X_Forwarded_FORMAT(header['X-Forwarded-For'] or ip), method, now() - start_time)
   local ok = sock:send(concat(response, CRLF)..CRLF2)
   if not ok then
     return
   end
-  return wsserver.start {cls = cls, sock = sock}
+  return wsserver.start { cls = cls, sock = sock, ext = ext }
 end
 
 local function send_header (sock, header)
@@ -479,11 +493,25 @@ function HTTP_PROTOCOL.EVENT_DISPATCH(fd, ipaddr, http)
           return sock:close()
         end
         local accept_encoding = HEADER['Accept-Encoding']
-        if enable_gzip and accept_encoding and find(accept_encoding, "gzip") then
-          local compress_body = gzcompress(body)
-          if compress_body then
-            header[#header+1] = 'Content-Encoding: gzip'
-            body = compress_body
+        if enable_gzip and type(accept_encoding) == 'string' and #body >= 50 then
+          local YES = false
+          -- 如果支持deflate则使用compress压缩
+          if find(lower(accept_encoding), "deflate") then
+            local compress_body = decompress(body)
+            if compress_body then
+              header[#header+1] = 'Content-Encoding: deflate'
+              body = compress_body
+              YES = true
+            end
+          end
+          -- 如果支持gzip就使用gzip压缩后返回
+          if not YES and find(lower(accept_encoding), "gzip") then
+            local compress_body = gzcompress(body)
+            if compress_body then
+              header[#header+1] = 'Content-Encoding: gzip'
+              body = compress_body
+              YES = true
+            end
           end
         end
         header[#header+1] = 'Content-Length: ' .. #body
