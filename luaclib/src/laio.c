@@ -1,13 +1,13 @@
 #define LUA_LIB
 
+/* 工作线程最大使用堆栈 */
+#define EIO_STACKSIZE (1 << 16)
+
 #include <core.h>
 #include <eio.h>
 
 /* 初始化 */
 static int INITIALIZATION = 0;
-
-/* 工作线程最大使用堆栈 */
-#define EIO_STACKSIZE (1 << 16)
 
 /* 最小线程数量 */
 #define AIO_MAX_NTHREADS 8
@@ -16,27 +16,93 @@ static int INITIALIZATION = 0;
 
 #define luaL_push_string_string(L, k, v) ({ lua_pushliteral(L, k); lua_pushstring(L, (v)); lua_rawset(L, -3); })
 
- #ifndef S_ISDIR
-   #define S_ISDIR(mode)  (mode & _S_IFDIR)
- #endif
- #ifndef S_ISREG
-   #define S_ISREG(mode)  (mode & _S_IFREG)
- #endif
- #ifndef S_ISLNK
-   #define S_ISLNK(mode)  (0)
- #endif
- #ifndef S_ISSOCK
-   #define S_ISSOCK(mode)  (0)
- #endif
- #ifndef S_ISFIFO
-   #define S_ISFIFO(mode)  (0)
- #endif
- #ifndef S_ISCHR
-   #define S_ISCHR(mode)  (mode&_S_IFCHR)
- #endif
- #ifndef S_ISBLK
-   #define S_ISBLK(mode)  (0)
- #endif
+/* --- 文件(夹)类型 --- */
+
+/* 内核宏 判断类型是否为目录 */
+#ifndef S_ISDIR
+ #define S_ISDIR(mode)  (mode & _S_IFDIR)
+#endif
+
+/* 内核宏 判断类型是否为常规文件 */
+#ifndef S_ISREG
+ #define S_ISREG(mode)  (mode & _S_IFREG)
+#endif
+
+/* 内核宏 判断是否为链接 */
+#ifndef S_ISLNK
+ #define S_ISLNK(mode)  (0)
+#endif
+
+/* 内核宏 判断是否为域套接字 */
+#ifndef S_ISSOCK
+ #define S_ISSOCK(mode)  (0)
+#endif
+
+/* 内核宏 判断是否为命名管道 */
+#ifndef S_ISFIFO
+ #define S_ISFIFO(mode)  (0)
+#endif
+
+/* 内核宏 判断是否为字符设备 */
+#ifndef S_ISCHR
+ #define S_ISCHR(mode)  (mode & _S_IFCHR)
+#endif
+
+/* 内核宏 判断是否为块设备 */
+#ifndef S_ISBLK
+ #define S_ISBLK(mode)  (0)
+#endif
+
+/* --- 文件(夹)类型 --- */
+
+/* --- 文件(夹)权限 --- */
+
+/* 拥有者是否有读权限 */
+#ifndef S_IRUSR
+ #define S_IRUSR (1 << 8)
+#endif
+
+/* 拥有者是否有写权限 */
+#ifndef S_IWUSR
+ #define S_IWUSR (1 << 7)
+#endif
+
+/* 拥有者是否有执行权限 */
+#ifndef S_IXUSR
+ #define S_IXUSR (1 << 6)
+#endif
+
+/* 用户组是否有读权限 */
+#ifndef S_IRGRP
+ #define S_IRGRP (1 << 5)
+#endif
+
+/* 用户组是否有写权限 */
+#ifndef S_IWGRP
+ #define S_IWGRP (1 << 4)
+#endif
+
+/* 用户组是否有执行权限 */
+#ifndef S_IXGRP
+ #define S_IXGRP (1 << 3)
+#endif
+
+/* 其他人是否有读权限 */
+#ifndef S_IROTH
+ #define S_IROTH (1 << 2)
+#endif
+
+/* 其他人是否有写权限 */
+#ifndef S_IWOTH
+ #define S_IWOTH (1 << 1)
+#endif
+
+/* 其他人是否有执行权限 */
+#ifndef S_IXOTH
+ #define S_IXOTH (1 << 0)
+#endif
+
+/* --- 文件(夹)权限 --- */
 
 static inline void luaL_push_string_integer(lua_State* L, const char* k, int v) {
   lua_pushstring(L, k);
@@ -65,8 +131,7 @@ static inline const char *mode2string (mode_t mode) {
 }
 
 /* 权限转字符串 */
-static inline const char *perm2string (mode_t mode) {
-  static char perms[10] = "---------";
+static inline const char *perm2string (mode_t mode, char* perms) {
   int i;
   for (i=0;i<9;i++) perms[i]='-';
   if (mode & S_IRUSR) perms[0] = 'r';
@@ -82,6 +147,7 @@ static inline const char *perm2string (mode_t mode) {
 }
 
 static inline void luaL_push_stat(lua_State *co, eio_req *req) { 
+  char permissions[10] = "---------";
   struct stat *st = (struct stat *)req->ptr2;
   luaL_push_string_string(co,  "mode", mode2string(st->st_mode));
   luaL_push_string_integer(co, "dev", st->st_dev); 
@@ -96,11 +162,11 @@ static inline void luaL_push_stat(lua_State *co, eio_req *req) {
   luaL_push_string_integer(co, "size", st->st_size); 
   luaL_push_string_integer(co, "blocks", st->st_blocks); 
   luaL_push_string_integer(co, "blksize", st->st_blksize); 
-  luaL_push_string_string(co,  "permissions", perm2string(st->st_mode));
+  luaL_push_string_string(co,  "permissions", perm2string(st->st_mode, permissions));
 }
 
 /* AIO方法只需要简单返回状态时, 可以使用这个回调 */
-int AIO_RESPONSE(eio_req* req) {
+static int AIO_RESPONSE(eio_req* req) {
   lua_State* co = (lua_State*)req_data_to_coroutine(req);
   if (EIO_RESULT (req)){
     lua_pushboolean(co, 0);
@@ -115,7 +181,7 @@ int AIO_RESPONSE(eio_req* req) {
 }
 
 /* AIO方法需要返回数值和fd时, 可以使用这个回调 */
-int AIO_RESPONSE_FD(eio_req* req) {
+static int AIO_RESPONSE_FD(eio_req* req) {
   lua_State* co = (lua_State*)req_data_to_coroutine(req);
   if (EIO_RESULT (req) == -1){
     lua_pushboolean(co, 0);
@@ -130,7 +196,7 @@ int AIO_RESPONSE_FD(eio_req* req) {
 }
 
 /* AIO调用读取数据则需要使用此回调 */
-int AIO_RESPONSE_READ(eio_req* req) {
+static int AIO_RESPONSE_READ(eio_req* req) {
   lua_State* co = (lua_State*)req_data_to_coroutine(req);
   if (EIO_RESULT (req) == -1){
     lua_pushboolean(co, 0);
@@ -146,7 +212,7 @@ int AIO_RESPONSE_READ(eio_req* req) {
 }
 
 /* AIO调用写入数据则需要使用此回调 */
-int AIO_RESPONSE_WRITE(eio_req* req) {
+static int AIO_RESPONSE_WRITE(eio_req* req) {
   lua_State* co = (lua_State*)req_data_to_coroutine(req);
   if (EIO_RESULT (req) == -1){
     lua_pushboolean(co, 0);
@@ -161,7 +227,7 @@ int AIO_RESPONSE_WRITE(eio_req* req) {
 }
 
 /* AIO调用stat是需要使用此回调 */
-int AIO_RESPONSE_STAT(eio_req* req) {
+static int AIO_RESPONSE_STAT(eio_req* req) {
   lua_State* co = (lua_State*)req_data_to_coroutine(req);
   if (EIO_RESULT (req) != -1){
     lua_createtable(co, 0, 16);
@@ -177,12 +243,13 @@ int AIO_RESPONSE_STAT(eio_req* req) {
 }
 
 /* AIO调用需要循环检查文件名称必须使用此回调 */
-int AIO_RESPONSE_DIR(eio_req* req) {
+static int AIO_RESPONSE_DIR(eio_req* req) {
   lua_State* co = (lua_State*)req_data_to_coroutine(req);
   if (EIO_RESULT (req) >= 0){
     lua_createtable(co, EIO_RESULT (req), 0);
     char *buf = (char *)EIO_BUF (req);
-    for (int i = 0; i < EIO_RESULT (req); i++) {
+    int i;
+    for (i = 0; i < EIO_RESULT (req); i++) {
       lua_pushlstring(co, buf, strlen(buf));
       lua_rawseti(co, -2, i + 1);
       buf += strlen(buf) + 1;
@@ -210,7 +277,7 @@ int AIO_RESPONSE_PATH(eio_req* req) {
 static int sp[2];
 
 static void AIO_WANT_POLL(void) {
-  // printf("AIO_WANT_POLL Called. 主线程ID为: %d\n", pthread_self());
+  // printf("AIO_WANT_POLL Called. 工作线程ID为: %d\n", pthread_self());
   char event = '1';
   write(sp[1], &event, 1);
  }
@@ -234,7 +301,7 @@ static void AIO_EVENT(CORE_P_ core_io *io, int revents) {
 
 static core_io io_watcher;
 
-int pip_init() {
+static int pip_init() {
 
   /* 创建管道 */
   if (-1 == socketpair(AF_LOCAL, SOCK_STREAM, 0, sp))
@@ -256,7 +323,7 @@ int pip_init() {
 
 }
 
-int aio_init() {
+static int aio_init() {
 
   /* 初始化eio内部数据 */
   if (eio_init(AIO_WANT_POLL, AIO_DONE_POLL))
@@ -277,7 +344,7 @@ int aio_init() {
 
 
 
-/* 打开文件描述符 */
+/* aio.open 打开文件描述符 */
 static int laio_open(lua_State* L) {
   lua_State *t = lua_tothread(L, 1);
   if (!t)
@@ -294,7 +361,7 @@ static int laio_open(lua_State* L) {
   return 1;
 }
 
-/* aio.write 从文件内读取数据  */
+/* aio.read 从文件内读取数据  */
 static int laio_read(lua_State* L) {
   lua_State *t = lua_tothread(L, 1);
   if (!t)
@@ -319,7 +386,7 @@ static int laio_write(lua_State* L) {
     return luaL_error(L, "Invalid aio truncate [path].");
   }
 
-  /* 当offset大于0使用pwrite, 否则使用pwrite */
+  /* 当offset大于等于0使用pwrite, 否则使用write */
   eio_write(fd, (void*)buffer, buffer_size, lua_tointeger(L, 4), EIO_PRI_DEFAULT, AIO_RESPONSE_WRITE, (void*)t);
   return 1;
 }

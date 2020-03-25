@@ -55,7 +55,7 @@ function File:read( bytes )
   if not bytes or bytes <= 0 then
     return nil, "Invalid file read bytes."
   end
-  assert(self.__READ__, "File:read方法不可以在多个协程中并发调用.")
+  assert(not self.__READ__, "File:read方法不可以在多个协程中并发调用.")
   if not self.read_offset then
     self.read_offset = 0
   end
@@ -82,7 +82,17 @@ function File:readall()
     return ""
   end
   assert(not self.__READ__, "File:readall方法不可以在多个协程中并发调用.")
-  self.read_offset = 0
+  if not self.read_offset then
+    self.read_offset = 0 -- 如果没有读取过, 则一次性全部读取完毕.
+  else
+    -- 如果调用这个之前有调用过read, 那么将使用read_offset将之后的字节全部读取出来
+    -- 如果已经读到末尾, 则直接返回空字符串并且调整read_offset确保一致性.
+    bytes = bytes > self.read_offset and bytes - self.read_offset or 0
+    if bytes == 0 then
+      self.read_offset = self.stat.size
+      return ""
+    end
+  end
   self.__READ__ = { current_co = co_self() }
   self.__READ__.event_co = co_new(function ( data, size )
     local current_co = self.__READ__.current_co
@@ -137,7 +147,7 @@ function File:clean()
   if self.status == "close" then
     return nil, "File already Closed."
   end
-  self.__CLEAN__ = assert(not self.__CLEAN__ and true, "File:flush方法不可以在多个协程中并发调用.")
+  self.__CLEAN__ = assert(not self.__CLEAN__, "File:clean方法不可以在多个协程中并发调用.")
   local ok, err = aio.truncate(self.path, 0)
   if not ok then
     self.__CLEAN__ = nil
