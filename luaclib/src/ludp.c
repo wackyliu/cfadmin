@@ -1,6 +1,6 @@
 #define LUA_LIB
 
-#include "../../src/core.h"
+#include <core.h>
 
 static inline
 void SETSOCKETOPT(int sockfd) {
@@ -11,29 +11,31 @@ void SETSOCKETOPT(int sockfd) {
 	/* 设置非阻塞 */
 	non_blocking(sockfd);
 
+/* 地址重用 */
 #ifdef SO_REUSEADDR
-   /* 端口重用 */
   ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &Enable, sizeof(Enable));
-	if (ret) {
-		LOG("ERROR", "设置 SO_REUSEADDR 失败.");
-		return exit(-1);
-	}
+  if (ret) {
+    LOG("ERROR", "设置 SO_REUSEADDR 失败.");
+    return _exit(-1);
+  }
 #endif
 
+/* 端口重用 */
 #ifdef SO_REUSEPORT
-	ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &Enable, sizeof(Enable));
-	if (ret) {
-		LOG("ERROR", "设置 SO_REUSEPORT 失败.");
-		return exit(-1);
-	}
+  ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &Enable, sizeof(Enable));
+  if (ret) {
+    LOG("ERROR", "设置 SO_REUSEPORT 失败.");
+    return _exit(-1);
+  }
 #endif
 
+/* 开启IPV6与ipv4双栈 */
 #ifdef IPV6_V6ONLY
-  int On = 0;
-  ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &On, sizeof(On));
+  int No = 0;
+  ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&No, sizeof(No));
   if (ret){
-    LOG("ERROR", "IPV6_V6ONLY 设置失败.");
-    return exit(-1);
+    LOG("ERROR", "IPV6_V6ONLY 关闭失败.");
+    return _exit(-1);
   }
 #endif
 

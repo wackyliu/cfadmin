@@ -1,5 +1,8 @@
 local class = require "class"
 
+local sys = require "sys"
+local new_tab = sys.new_tab
+
 local cf = require "cf"
 local co_new = coroutine.create
 local co_self = cf.self
@@ -9,7 +12,10 @@ local co_wakeup = cf.wakeup
 local laio = require "laio"
 local aio_open = laio.open
 local aio_stat = laio.stat
+local aio_create = laio.create
 local aio_flush = laio.flush
+local aio_fflush = laio.fflush
+local aio_remove = laio.remove
 local aio_read = laio.read
 local aio_write = laio.write
 local aio_close = laio.close
@@ -46,105 +52,88 @@ function File:__gc()
   return true
 end
 
--- 读取文件指定大小内容
+-- 重置read_offset; 这个方法一般情况下不会用到, 除非你非常明白自己在做什么.
+function File:read_lseek(read_offset)
+  if toint(read_offset) and toint(read_offset) >= 0 then
+    self.read_offset = read_offset
+  end
+end
+
+-- 读取文件指定大小内容; 除非调用read_lseek重置位置或有新内容写入, 否则超出文件长度后将会返回空字符串.
 function File:read( bytes )
-  if self.status == "close" then
+  if self.status == "closed" then
     return nil, "File already Closed."
   end
   bytes = toint(bytes)
   if not bytes or bytes <= 0 then
+    if bytes == 0 then
+      return "", 0
+    end
     return nil, "Invalid file read bytes."
   end
-  assert(not self.__READ__, "File:read方法不可以在多个协程中并发调用.")
-  if not self.read_offset then
-    self.read_offset = 0
-  end
-  self.__READ__ = { current_co = co_self() }
-  self.__READ__.event_co = co_new(function ( data, size )
-    local current_co = self.__READ__.current_co
-    if type(data) == 'string' then
-      self.read_offset = self.read_offset + size
-    end
+  self.__READ__ = assert(not self.__READ__, "File:read/readall方法不可以在多个协程中并发调用.")
+  local stat, err = aio.stat(self.path)
+  if not stat then
     self.__READ__ = nil
-    return co_wakeup(current_co, data, size)
-  end)
-  aio_read(self.__READ__.event_co, self.fd, bytes, self.read_offset)
-  return co_wait()
+    return nil, err
+  end
+  self.stat = stat
+  -- 这一段的意思是: 当存在offset则取offset, 否则将offset置0; 无特殊情况不需要改动此地方
+  self.read_offset = stat.size - (stat.size - (toint(self.read_offset) and toint(self.read_offset) > 0 and toint(self.read_offset) or 0))
+  local data, err = aio._read(self.fd, bytes, self.read_offset)
+  self.read_offset = self.read_offset + #data
+  self.__READ__ = nil
+  return data, err
 end
 
--- 读取文件所有内容
+-- 读取文件所有内容; 除非调用read_lseek重置位置或有新内容写入, 否则超出文件长度后将会返回空字符串.
 function File:readall()
-  if self.status == "close" then
+  if self.status == "closed" then
     return nil, "File already Closed."
   end
-  local bytes = toint(self.stat.size)
-  if not bytes or bytes < 1 then
-    return ""
-  end
-  assert(not self.__READ__, "File:readall方法不可以在多个协程中并发调用.")
-  if not self.read_offset then
-    self.read_offset = 0 -- 如果没有读取过, 则一次性全部读取完毕.
-  else
-    -- 如果调用这个之前有调用过read, 那么将使用read_offset将之后的字节全部读取出来
-    -- 如果已经读到末尾, 则直接返回空字符串并且调整read_offset确保一致性.
-    bytes = bytes > self.read_offset and bytes - self.read_offset or 0
-    if bytes == 0 then
-      self.read_offset = self.stat.size
-      return ""
-    end
-  end
-  self.__READ__ = { current_co = co_self() }
-  self.__READ__.event_co = co_new(function ( data, size )
-    local current_co = self.__READ__.current_co
-    if type(data) == 'string' then
-      self.read_offset = self.read_offset + size
-    end
+  self.__READ__ = assert(not self.__READ__, "File:read/readall方法不可以在多个协程中并发调用.")
+  local stat, err = aio.stat(self.path)
+  if not stat then
     self.__READ__ = nil
-    return co_wakeup(current_co, data, size)
-  end)
-  aio_read(self.__READ__.event_co, self.fd, bytes, self.read_offset)
-  return co_wait()
+    return nil, err
+  end
+  self.stat = stat
+  -- 这一段的意思是: 当存在offset则取offset, 否则将offset置0; 无特殊情况不需要改动此地方
+  self.read_offset = stat.size - (stat.size - (toint(self.read_offset) and toint(self.read_offset) > 0 and toint(self.read_offset) or 0))
+  local data, err = aio._read(self.fd, toint(self.stat.size), self.read_offset)
+  self.read_offset = self.read_offset + #data
+  self.__READ__ = nil
+  return data, err
 end
 
 -- 写入文件
 function File:write( data )
-  if self.status == "close" then
+  if self.status == "closed" then
     return nil, "File already Closed."
   end
-  assert(not self.__WRITE__, "File:write方法不可以在多个协程中并发调用.")
   if type(data) ~= 'string' or data == "" then
     return nil, "Invalid file write data."
   end
-  self.__WRITE__ = { current_co = co_self() }
-  self.__WRITE__.event_co = co_new(function ( data, err )
-    local current_co = self.__WRITE__.current_co
-    self.__WRITE__ = nil
-    return co_wakeup(current_co, data, err)
-  end)
-  aio_write(self.__WRITE__.event_co, self.fd, data, self.stat.size)
-  self.stat.size =  self.stat.size + #data
-  return co_wait()
+  self.__WRITE__ = assert(not self.__WRITE__, "File:write方法不可以在多个协程中并发调用.")
+  local size, err = aio._write(self.fd, data)
+  self.__WRITE__ = nil
+  return size, err
 end
 
 -- 刷新缓存
 function File:flush()
-  if self.status == "close" then
+  if self.status == "closed" then
     return nil, "File already Closed."
   end
-  assert(not self.__FLUSH__, "File:flush方法不可以在多个协程中并发调用.")
-  self.__FLUSH__ = { current_co = co_self() }
-  self.__FLUSH__.event_co = co_new(function ( ok, err )
-    local current_co = self.__FLUSH__.current_co
-    self.__FLUSH__ = nil
-    return co_wakeup(current_co, ok, err)
-  end)
-  aio_flush(self.__FLUSH__.event_co, self.fd)
-  return co_wait()
+  self.__FLUSH__ = assert(not self.__FLUSH__, "File:flush方法不可以在多个协程中并发调用.")
+  local ok, err = aio.flush(self.fd)
+  self.__FLUSH__ = nil
+  return ok, err
 end
 
 -- 清空文件
 function File:clean()
-  if self.status == "close" then
+  if self.status == "closed" then
     return nil, "File already Closed."
   end
   self.__CLEAN__ = assert(not self.__CLEAN__, "File:clean方法不可以在多个协程中并发调用.")
@@ -168,54 +157,133 @@ end
 
 -- 关闭文件描述符
 function File:close( ... )
-  if self.status == "close" then
-    return nil, "File already Closed."
+  if self.status == "closed" then
+    return nil, "File already closed."
   end
-  self.__CLOSE__ = { current_co = co_self()}
-  self.__CLOSE__.event_co = co_new(function ( ok, err )
-    local current_co = self.__CLOSE__.current_co
-    self.__CLOSE__ = nil
-    return co_wakeup(current_co, ok, err)
-  end)
-  aio_close(self.__CLOSE__.event_co, self.fd)
-  self.status = "closed"; self.fd = nil;
-  return co_wait()
+  local fd = self.fd
+  self.fd = nil
+  self.status = "closed"
+  return aio._close(fd)
 end
 
 -- 打开文件(始终以rw模式打开, 没有则会创建)
 function aio.open(filename)
-  filename = assert(type(filename) == 'string' and filename ~= '' and filename ~= '.' and filename ~= '..' and filename, "Invalid filename.")
-  local t = {}
-  t.current_co = co_self()
-  t.event_co = co_new(function ( fd, err)
-    aio[t] = nil  
-    return co_wakeup(t.current_co, fd, err)
-  end)
-  aio[t] = true
-  aio_open(t.event_co, filename)
-  local fd, err = co_wait()
+  local fd, err = aio._open(filename)
   if not fd then
     return nil, err
   end
   local stat, err = aio.stat(filename)
   if not stat then
-    local t = {}
+    local t = new_tab(0, 3)
     t.current_co = co_self()
     t.event_co = co_new(function ( ok, err )
       aio[t] = nil  
       return co_wakeup(t.current_co, ok, err)
     end)
     aio[t] = true
-    aio_close(t.event_co, filename)
+    aio_close(t.event_co, fd)
+    return co_wait()
+  end
+  return File:new { fd = fd, path = filename }
+end
+
+-- 仅返回fd
+function aio._open(filename)
+  filename = assert(type(filename) == 'string' and filename ~= '' and filename ~= '.' and filename ~= '..' and filename, "Invalid filename.")
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( fd, err)
+    aio[t] = nil
+    return co_wakeup(t.current_co, fd, err)
+  end)
+  aio[t] = true
+  aio_open(t.event_co, filename)
+  return co_wait()
+end
+
+-- 打开文件, 如果
+function aio.create(filename)
+  local fd, err = aio._create(filename)
+  if not fd then
+    return nil, err
+  end
+  local stat, err = aio.stat(filename)
+  if not stat then
+    local t = new_tab(0, 3)
+    t.current_co = co_self()
+    t.event_co = co_new(function ( ok, err )
+      aio[t] = nil
+      return co_wakeup(t.current_co, ok, err)
+    end)
+    aio[t] = true
+    aio_close(t.event_co, fd)
     return co_wait()
   end
   return File:new { fd = fd, path = filename, stat = stat }
 end
 
--- 创建指定目录
+function aio._create(filename)
+  filename = assert(type(filename) == 'string' and filename ~= '' and filename ~= '.' and filename ~= '..' and filename, "Invalid filename.")
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( fd, err)
+    aio[t] = nil
+    return co_wakeup(t.current_co, fd, err)
+  end)
+  aio[t] = true
+  aio_create(t.event_co, filename)
+  return co_wait()
+end
+
+-- 读取指定字节
+function aio._read(fd, bytes, offset)
+  fd = assert(toint(fd) and toint(fd) >= 0 and toint(fd), "Invalid fd.")
+  bytes = assert(toint(bytes) and toint(bytes) >= 0 and toint(bytes), "Invalid read bytes.")
+  offset = assert(toint(offset) and toint(offset) >= 0 and toint(offset), "Invalid read offset.")
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( data, size )
+    aio[t] = nil
+    return co_wakeup(t.current_co, data, size)
+  end)
+  aio[t] = true
+  aio_read(t.event_co, fd, bytes, offset)
+  return co_wait()
+end
+
+-- 写入(追加)指定大小数据
+function aio._write(fd, data)
+  fd = assert(toint(fd) and toint(fd) >= 0 and toint(fd), "Invalid fd.")
+  data = assert(type(data) == 'string' and data ~= '' and data, "Invalid write data.")
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( size, err )
+    aio[t] = nil
+    return co_wakeup(t.current_co, size, err)
+  end)
+  aio[t] = true
+  aio_write(t.event_co, fd, data)
+  return co_wait()
+end
+
+-- 仅关闭fd
+function aio._close(fd)
+  fd = assert(toint(fd) and toint(fd) >= 0 and toint(fd), "Invalid fd.")
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( ok, err )
+    aio[t] = nil
+    return co_wakeup(t.current_co, ok, err)
+  end)
+  aio[t] = true
+  aio_close(t.event_co, fd)
+  return co_wait()
+end
+
+-- 创建指定文件夹
 function aio.mkdir(dir)
   dir = assert(type(dir) == 'string' and dir ~= '' and dir, "Invalid folder.")
-  local t = {}
+  local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok, err )
     aio[t] = nil  
@@ -226,27 +294,28 @@ function aio.mkdir(dir)
   return co_wait()
 end
 
--- 删除指定目录
+-- 删除指定文件夹
 function aio.rmdir(dir)
-  local t = {}
+  dir = assert(type(dir) == 'string' and dir ~= '' and dir, "Invalid folder.")
+  local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok, err )
     aio[t] = nil  
     return co_wakeup(t.current_co, ok, err)
   end)
   aio[t] = true
-  aio_rmdir(t.event_co, assert(type(dir) == 'string' and dir ~= '' and dir, "Invalid folder."))
+  aio_rmdir(t.event_co, dir)
   return co_wait()
 end
 
--- 获取文件/目录状态
+-- 获取文件/文件夹状态
 function aio.attributes(path)
   return aio.stat(path)
 end
 
--- 获取文件/目录状态
+-- 获取文件/文件夹状态
 function aio.stat(path)
-  local t = {}
+  local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( list, err )
     aio[t] = nil  
@@ -257,10 +326,10 @@ function aio.stat(path)
   return co_wait()
 end
 
--- 获取目录下所有文件
+-- 获取文件夹下所有文件(文件夹)
 function aio.dir(path)
   path = assert(type(path) == 'string' and path ~= '' and path, "Invalid path.")
-  local t = {}
+  local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( dirs )
     aio[t] = nil  
@@ -275,7 +344,7 @@ end
 function aio.rename(old_name, new_name)
   old_name = assert(type(old_name) == 'string' and old_name ~= '' and old_name, "Invalid old_name.")
   new_name = assert(type(new_name) == 'string' and new_name ~= '' and new_name, "Invalid new_name.")
-  local t = {}
+  local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok )
     aio[t] = nil  
@@ -293,25 +362,23 @@ end
 
 -- 获取指定目录完整路径
 function aio.readpath(path)
-  local t = {}
+  path = assert(type(path) == "string" and path ~= "" and path, "Invalid read path.")
+  local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( path )
     aio[t] = nil  
     return co_wakeup(t.current_co, path )
   end)
   aio[t] = true
-  if type(path) ~= 'string' or path == "" then
-    return nil, "Invalid path"
-  end
   aio_readpath(t.event_co, path)
   return co_wait()
 end
 
--- 清空文件或者缩减文件大小. 当length为0或者nil的时候将会清空文件.
+-- 清空文件或者缩减文件内容到指定大小. 当length为0或者nil的时候将会清空文件.
 -- 注意: 这个操作是非常危险的, 您需要非常清楚自己的做什么.
 function aio.truncate(filename, length)
   filename = assert(type(filename) == 'string' and filename ~= '' and filename, "Invalid filename.")
-  local t = {}
+  local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok, err )
     aio[t] = nil  
@@ -319,6 +386,44 @@ function aio.truncate(filename, length)
   end)
   aio[t] = true
   aio_truncate(t.event_co, filename, (toint(length) and toint(length) > 0) and toint(length) or 0)
+  return co_wait()
+end
+
+-- 刷新fd缓存
+function aio.flush(fd)
+  fd = assert(toint(fd) and toint(fd) >= 0 and toint(fd), "Invalid fd.")
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( ok, err )
+    aio[t] = nil
+    return co_wakeup(t.current_co, ok, err)
+  end)
+  aio[t] = true
+  aio_flush(t.event_co, fd)
+  return co_wait()
+end
+
+-- 刷新FILE指针缓存
+function aio.fflush(file)
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( ok, err )
+    aio[t] = nil
+    return co_wakeup(t.current_co, ok, err)
+  end)
+  aio[t] = aio_fflush(t.event_co, file)
+  return co_wait()
+end
+
+-- 移除文件或文件夹
+function aio.remove(filename)
+  local t = new_tab(0, 3)
+  t.current_co = co_self()
+  t.event_co = co_new(function ( ok, err )
+    aio[t] = nil
+    return co_wakeup(t.current_co, ok, err)
+  end)
+  aio[t] = aio_remove(t.event_co, filename)
   return co_wait()
 end
 
