@@ -1,8 +1,20 @@
 #include "core.h"
 
-#define LUALIBS_PATH "lualib/?.lua;lualib/?/init.lua;./?.lua;./?/init.lua;script/?.lua;script/?/init.lua;"
-
-#define LUACLIBS_PATH "luaclib/?.so;luaclib/lib?.so;./?.so;luaclib/msys-?.dll;luaclib/?.dll;./msys-?.dll;./?.dll;"
+#ifdef __MSYS__
+	#ifndef LUALIBS_PATH
+		#define LUALIBS_PATH "lualib/?.lua;lualib/?/init.lua;./?.lua;./?/init.lua;script/?.lua;script/?/init.lua;"
+	#endif
+	#ifndef LUACLIBS_PATH
+		#define LUACLIBS_PATH "luaclib/?.so;luaclib/lib?.so;./?.so;luaclib/msys-?.dll;luaclib/?.dll;./msys-?.dll;./?.dll;"
+	#endif
+#else
+	#ifndef LUALIBS_PATH
+		#define LUALIBS_PATH "lualib/?.lua;lualib/?/init.lua;./?.lua;./?/init.lua;script/?.lua;script/?/init.lua;"
+	#endif
+	#ifndef LUACLIBS_PATH
+		#define LUACLIBS_PATH "luaclib/?.so;./?.so;luaclib/lib?.so;./lib?.so;luaclib/?.dylib;./?.dylib;luaclib/lib?.dylib;./lib?.dylib;"
+	#endif
+#endif
 
 /*
 const char *signame[]= {
