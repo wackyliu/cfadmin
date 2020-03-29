@@ -66,8 +66,8 @@
   </div>
   <script src="/js/echarts.min.js"></script>
   <script type="text/javascript">
-  layui.use(['jquery', 'layer'], function() {
-    var $, layer = layui.$, layui.layer;
+  layui.use(['jquery'], function() {
+    var $ = layui.$;
     // 基于准备好的dom，初始化echarts实例
     var myChart = echarts.init(document.getElementById('main1'));
 
