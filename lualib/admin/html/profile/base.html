@@ -118,8 +118,7 @@
     layui.use(['form', 'layer'],
         function() {
             $ = layui.jquery;
-            var {form, layer} = layui;
-
+            var form, layer = layui.form, layui.layer;
             // 更新用户密码
             form.on('submit(pwsubmit)', function(data) {
               $('#pwsubmit').hide();

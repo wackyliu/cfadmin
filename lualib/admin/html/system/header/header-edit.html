@@ -69,7 +69,7 @@
 
           layui.use(['form', 'layer'], function() {
               $ = layui.jquery;
-              var {form, layer} = layui;
+              var form, layer = layui.form, layui.layer;
               form.on('submit(edit)',function(data) {
                 if (!$('#submit').is(":hidden")) {
                   $('#submit').hide();
