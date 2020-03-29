@@ -45,10 +45,9 @@
       </script>
     </div>
     <script type="text/javascript">
-      var {form, table} = {};
       layui.use('table', function(){
         $ = layui.jquery;
-        var table, form = layui.table, layui.form;
+        var table = layui.table;
         //监听工具条
         table.on('tool(table)', function(obj){
           var data = obj.data;
