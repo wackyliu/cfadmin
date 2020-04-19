@@ -47,17 +47,29 @@ local aes_ecb_decrypt = CRYPT.aes_ecb_decrypt
 local aes_cbc_encrypt = CRYPT.aes_cbc_encrypt
 local aes_cbc_decrypt = CRYPT.aes_cbc_decrypt
 
+-- 填充方式
+local RSA_NO_PADDING = CRYPT.RSA_NO_PADDING
+local RSA_PKCS1_PADDING = CRYPT.RSA_PKCS1_PADDING
+local RSA_PKCS1_OAEP_PADDING = CRYPT.RSA_PKCS1_OAEP_PADDING
+
 local rsa_public_key_encode = CRYPT.rsa_public_key_encode
 local rsa_private_key_decode = CRYPT.rsa_private_key_decode
 
 local rsa_private_key_encode = CRYPT.rsa_private_key_encode
 local rsa_public_key_decode = CRYPT.rsa_public_key_decode
 
-local sha128WithRsa_sign = CRYPT.sha128WithRsa_sign
-local sha128WithRsa_verify = CRYPT.sha128WithRsa_verify
+-- 当前支持的签名与验签
+local rsa_algorithms = {
+  ["md5"]     =  CRYPT.nid_md5,
+  ["sha1"]    =  CRYPT.nid_sha1,
+  ["sha128"]  =  CRYPT.nid_sha1,
+  ["sha256"]  =  CRYPT.nid_sha256,
+  ["sha512"]  =  CRYPT.nid_sha512,
+}
 
-local sha256WithRsa_sign = CRYPT.sha256WithRsa_sign
-local sha256WithRsa_verify = CRYPT.sha256WithRsa_verify
+-- 当前支持的签名与验签方法
+local rsa_sign = CRYPT.rsa_sign
+local rsa_verify = CRYPT.rsa_verify
 
 local crypt = {}
 
@@ -203,7 +215,7 @@ function crypt.hmac64_md5 (key, text, hex)
 end
 
 function crypt.aes_128_cbc_encrypt(key, text, iv, hex)
-  local hash = aes_cbc_encrypt(16, key, text, (type(iv) == 'string' and #iv == 16) and iv or "")
+  local hash = aes_cbc_encrypt(16, #key == 16 and key or nil, text, iv)
   if hash and hex then
     return hexencode(hash)
   end
@@ -211,7 +223,39 @@ function crypt.aes_128_cbc_encrypt(key, text, iv, hex)
 end
 
 function crypt.aes_128_ecb_encrypt(key, text, iv, hex)
-  local hash = aes_ecb_encrypt(16, key, text, (type(iv) == 'string' and #iv == 16) and iv or "")
+  local hash = aes_ecb_encrypt(16, #key == 16 and key or nil, text, iv)
+  if hash and hex then
+    return hexencode(hash)
+  end
+  return hash
+end
+
+function crypt.aes_192_cbc_encrypt(key, text, iv, hex)
+  local hash = aes_cbc_encrypt(24, #key == 24 and key or nil, text, iv)
+  if hash and hex then
+    return hexencode(hash)
+  end
+  return hash
+end
+
+function crypt.aes_192_ecb_encrypt(key, text, iv, hex)
+  local hash = aes_ecb_encrypt(24, #key == 24 and key or nil, text, iv)
+  if hash and hex then
+    return hexencode(hash)
+  end
+  return hash
+end
+
+function crypt.aes_256_cbc_encrypt(key, text, iv, hex)
+  local hash = aes_cbc_encrypt(32, #key == 32 and key or nil, text, iv)
+  if hash and hex then
+    return hexencode(hash)
+  end
+  return hash
+end
+
+function crypt.aes_256_ecb_encrypt(key, text, iv, hex)
+  local hash = aes_ecb_encrypt(32, #key == 32 and key or nil, text, iv)
   if hash and hex then
     return hexencode(hash)
   end
@@ -219,11 +263,27 @@ function crypt.aes_128_ecb_encrypt(key, text, iv, hex)
 end
 
 function crypt.aes_128_cbc_decrypt(key, text, iv)
-  return aes_cbc_decrypt(16, key, text, (type(iv) == 'string' and #iv == 16) and iv or "")
+  return aes_cbc_decrypt(16, #key == 16 and key or nil, text, iv)
 end
 
 function crypt.aes_128_ecb_decrypt(key, text, iv)
-  return aes_ecb_decrypt(16, key, text, (type(iv) == 'string' and #iv == 16) and iv or "")
+  return aes_ecb_decrypt(16, #key == 16 and key or nil, text, iv)
+end
+
+function crypt.aes_192_cbc_decrypt(key, text, iv)
+  return aes_cbc_decrypt(24, #key == 24 and key or nil, text, iv)
+end
+
+function crypt.aes_192_ecb_decrypt(key, text, iv)
+  return aes_ecb_decrypt(24, #key == 24 and key or nil, text, iv)
+end
+
+function crypt.aes_256_cbc_decrypt(key, text, iv)
+  return aes_cbc_decrypt(32, #key == 32 and key or nil, text, iv)
+end
+
+function crypt.aes_256_ecb_decrypt(key, text, iv)
+  return aes_ecb_decrypt(32, #key == 32 and key or nil, text, iv)
 end
 
 function crypt.base64urlencode(data)
@@ -291,7 +351,15 @@ end
 
 -- text 为原始文本内容, public_key_path 为公钥路径, b64 为是否为结果进行base64编码
 function crypt.rsa_public_key_encode(text, public_key_path, b64)
-  local hash = rsa_public_key_encode(text, public_key_path)
+  local hash = rsa_public_key_encode(text, public_key_path, RSA_PKCS1_PADDING)
+  if hash and b64 then
+    return base64encode(hash)
+  end
+  return hash
+end
+
+function crypt.rsa_public_key_oaep_padding_encode(text, public_key_path, b64)
+  local hash = rsa_public_key_encode(text, public_key_path, RSA_PKCS1_OAEP_PADDING)
   if hash and b64 then
     return base64encode(hash)
   end
@@ -300,12 +368,25 @@ end
 
 -- text 为加密后的内容, private_key_path 为私钥路径, b64 为是否为text先进行base64解码
 function crypt.rsa_private_key_decode(text, private_key_path, b64)
-  return rsa_private_key_decode(b64 and base64decode(text) or text, private_key_path)
+  return rsa_private_key_decode(b64 and base64decode(text) or text, private_key_path, RSA_PKCS1_PADDING)
 end
+
+function crypt.rsa_private_key_oaep_padding_decode(text, private_key_path, b64)
+  return rsa_private_key_decode(b64 and base64decode(text) or text, private_key_path, RSA_PKCS1_OAEP_PADDING)
+end
+
 
 -- text 为原始文本内容, private_key_path 为公钥路径, b64 为是否为结果进行base64编码
 function crypt.rsa_private_key_encode(text, private_key_path, b64)
-  local hash = rsa_private_key_encode(text, private_key_path)
+  local hash = rsa_private_key_encode(text, private_key_path, RSA_PKCS1_PADDING)
+  if hash and b64 then
+    return base64encode(hash)
+  end
+  return hash
+end
+
+function crypt.rsa_private_key_oaep_padding_encode(text, private_key_path, b64)
+  local hash = rsa_private_key_encode(text, private_key_path, RSA_PKCS1_OAEP_PADDING)
   if hash and b64 then
     return base64encode(hash)
   end
@@ -314,39 +395,28 @@ end
 
 -- text 为加密后的内容, public_key_path 为公钥路径, b64 为是否为text先进行base64解码
 function crypt.rsa_public_key_decode(text, public_key_path, b64)
-  return rsa_public_key_decode(b64 and base64decode(text) or text, public_key_path)
+  return rsa_public_key_decode(b64 and base64decode(text) or text, public_key_path, RSA_PKCS1_PADDING)
 end
 
+function crypt.rsa_public_key_oaep_padding_decode(text, public_key_path, b64)
+  return rsa_public_key_decode(b64 and base64decode(text) or text, public_key_path, RSA_PKCS1_OAEP_PADDING)
+end
 
--- sha with rsa sign/verify
-function crypt.sha128_with_rsa_sign(text, private_key_path, hex)
-  local hash = sha128WithRsa_sign(text, private_key_path)
+-- RSA签名函数: 第一个参数是等待签名的明文, 第二个参数是私钥所在路径, 第三个参数是算法名称, 第四个参数决定是否以hex输出
+function crypt.rsa_sign(text, private_key_path, algorithm, hex)
+  local hash = rsa_sign(text, private_key_path, rsa_algorithms[(algorithm or ""):lower()] or rsa_algorithms["md5"])
   if hash and hex then
     return hexencode(hash)
   end
   return hash
 end
 
-function crypt.sha128_with_rsa_verify(text, public_key_path, sign, hex)
-  if hex and sign then
+-- RSA验签函数: 第一个参数是等待签名的明文, 第二个参数是私钥所在路径, 第三个参数为签名sign密文, 第四个参数是算法名称, 第五个参数决定是否对sign进行unhex
+function crypt.rsa_verify(text, public_key_path, sign, algorithm, hex)
+  if hex then
     sign = hexdecode(sign)
   end
-  return sha128WithRsa_verify(text, public_key_path, sign)
-end
-
-function crypt.sha256_with_rsa_sign(text, private_key_path, hex)
-  local hash = sha256WithRsa_sign(text, private_key_path)
-  if hash and hex then
-    return hexencode(hash)
-  end
-  return hash
-end
-
-function crypt.sha256_with_rsa_verify(text, public_key_path, sign, hex)
-  if hex and sign then
-    sign = hexdecode(sign)
-  end
-  return sha256WithRsa_verify(text, public_key_path, sign)
+  return rsa_verify(text, public_key_path, sign, rsa_algorithms[(algorithm or ""):lower()] or rsa_algorithms["md5"])
 end
 
 return crypt

@@ -43,8 +43,25 @@ static int lrandomkey(lua_State *L) {
 /* -- xor_str -- */
 
 
-LUAMOD_API int
-luaopen_lcrypt(lua_State *L) {
+#define lua_set_key_value(L, key, value) ({ lua_pushstring((L), (key)); lua_pushinteger((L), (value)); lua_rawset((L), -3); })
+
+static int crypt_set_key_value(lua_State *L) {
+  /* 增加rsa填充方式常量 */
+  lua_set_key_value(L, "RSA_NO_PADDING", RSA_NO_PADDING);
+  lua_set_key_value(L, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING);
+  lua_set_key_value(L, "RSA_PKCS1_OAEP_PADDING", RSA_PKCS1_OAEP_PADDING);
+
+  /* 增加rsa_sign/rsa_verify算法常量*/
+  lua_set_key_value(L, "nid_md5", NID_md5);
+  lua_set_key_value(L, "nid_sha1", NID_sha1);
+  lua_set_key_value(L, "nid_sha256", NID_sha256);
+  lua_set_key_value(L, "nid_sha512", NID_sha512);
+
+  return 1;
+}
+
+
+LUAMOD_API int luaopen_lcrypt(lua_State *L) {
   luaL_checkversion(L);
   luaL_Reg lcrypt[] = {
     { "uuid", luuid },
@@ -88,11 +105,9 @@ luaopen_lcrypt(lua_State *L) {
     // 私钥加密 -> 公钥解密
     { "rsa_private_key_encode", lrsa_private_key_encode },
     { "rsa_public_key_decode", lrsa_public_key_decode },
-    //shawithrsa
-    { "sha128WithRsa_sign", lSha128WithRsa_sign },
-    { "sha128WithRsa_verify", lSha128WithRsa_verify },
-    { "sha256WithRsa_sign", lSha256WithRsa_sign },
-    { "sha256WithRsa_verify", lSha256WithRsa_verify },
+    //md5/sha128/sha256/sha512 with rsa
+    {"rsa_sign", lrsa_sign},
+    {"rsa_verify", lrsa_verify},
     // aes 加密
     { "aes_ecb_encrypt", laes_ecb_encrypt },
     { "aes_cbc_encrypt", laes_cbc_encrypt },
@@ -108,5 +123,5 @@ luaopen_lcrypt(lua_State *L) {
     { NULL, NULL },
   };
   luaL_newlib(L, lcrypt);
-  return 1;
+  return crypt_set_key_value(L);
 }
