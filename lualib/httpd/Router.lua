@@ -54,7 +54,11 @@ end
 
 -- 主要用作分割hash路由查找
 local function to_route(route)
-	return spliter(route, "([/]+)", '/')
+  local r = spliter(route, "([/]+)", '/')
+  if byte(r, #r) ~= byte(slash) then
+    return r
+  end
+  return split(r, 1, -2)
 end
 
 -- 检查是路径回退是否超出静态文件根目录

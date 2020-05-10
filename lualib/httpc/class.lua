@@ -3,6 +3,7 @@ local hc_multi_request = hc.multi_request
 
 local class = require "class"
 
+local ua = require "httpc.ua"
 local protocol = require "httpc.protocol"
 local sock_new = protocol.sock_new
 local sock_recv = protocol.sock_recv
@@ -24,6 +25,7 @@ local type = type
 local assert = assert
 local ipairs = ipairs
 local tostring = tostring
+local tonumber = tonumber
 
 local random = math.random
 local find = string.find
@@ -47,8 +49,9 @@ local methods = {'get', 'post', 'json', 'file'}
 local httpc = class("httpc")
 
 function httpc:ctor (opt)
-  self.server = "cf/0.1"
+  self.reconnect = true
   self.timeout = opt.timeout or 15
+  self.server = ua.get_user_agent()
 end
 
 function httpc:jwt(...)
@@ -57,6 +60,65 @@ end
 
 function httpc:basic_authorization( ... )
   return build_basic_authorization(...)
+end
+
+-- 设置超时时间
+function httpc:set_timeout(timeout)
+  if tonumber(timeout) and tonumber(timeout) > 0 then
+    self.timeout = tonumber(timeout)
+    return self
+  end
+end
+
+-- 添加外置socket
+function httpc:set_socket(sock)
+  if type(sock) == 'table' then
+    self.sock = sock
+    return self
+  end
+end
+
+-- 关闭重试
+function httpc:disable_reconnect()
+  self.reconnect = false
+  return self
+end
+
+function httpc:send_request(opt, data)
+  if not self.sock then
+    if not self.reconnect then
+      return nil, "httpc class can't connect to server 1 : " .. self.domain
+    end
+    local sock = sock_new():timeout(self.timeout)
+    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
+    if not ok then
+      sock:close()
+      return nil, "httpc class can't connect to server : " .. self.domain
+    end
+    self.sock = sock
+  end
+
+  local ok, err = sock_send(self.sock, opt.protocol, data)
+  if not ok then
+    self.sock:close()
+    if not self.reconnect then
+      return nil, "httpc class can't connect to server 2 : " .. self.domain
+    end
+    local ok, err
+    local sock = sock_new():timeout(self.timeout)
+    ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
+    if not ok then
+      sock:close()
+      return ok, err
+    end
+    ok, err = sock_send(sock, opt.protocol, data)
+    if not ok then
+      sock:close()
+      return nil, err
+    end
+    self.sock = sock
+  end
+  return true
 end
 
 function httpc:raw( parameter )
@@ -98,32 +160,11 @@ function httpc:raw( parameter )
 
  local REQ = build_raw_req(opt)
 
-  if not self.sock then
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    self.sock = sock
-  end
-
-  local ok, err = sock_send(self.sock, opt.protocol, REQ)
+  local ok, err = self:send_request(opt, REQ)
   if not ok then
     self.sock:close()
     self.sock = nil
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    ok, err = sock_send(sock, opt.protocol, REQ)
-    if not ok then
-      sock:close()
-      return nil, err
-    end
-    self.sock = sock
+    return false, err
   end
 
   local code, msg = httpc_response(self.sock, opt.protocol)
@@ -159,32 +200,9 @@ function httpc:get (domain, headers, args, timeout)
 
   local REQ = build_get_req(opt)
 
-  if not self.sock then
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    self.sock = sock
-  end
-
-  local ok, err = sock_send(self.sock, opt.protocol, REQ)
+  local ok, err = self:send_request(opt, REQ)
   if not ok then
-    self.sock:close()
-    self.sock = nil
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    ok, err = sock_send(sock, opt.protocol, REQ)
-    if not ok then
-      sock:close()
-      return nil, err
-    end
-    self.sock = sock
+    return false, err
   end
 
   local code, msg = httpc_response(self.sock, opt.protocol)
@@ -219,32 +237,9 @@ function httpc:post (domain, headers, body, timeout)
 
   local REQ = build_post_req(opt)
 
-  if not self.sock then
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    self.sock = sock
-  end
-
-  local ok, err = sock_send(self.sock, opt.protocol, REQ)
+  local ok, err = self:send_request(opt, REQ)
   if not ok then
-    self.sock:close()
-    self.sock = nil
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    ok, err = sock_send(sock, opt.protocol, REQ)
-    if not ok then
-      sock:close()
-      return nil, err
-    end
-    self.sock = sock
+    return false, err
   end
 
   local code, msg = httpc_response(self.sock, opt.protocol)
@@ -279,32 +274,9 @@ function httpc:delete (domain, headers, body, timeout)
 
   local REQ = build_delete_req(opt)
 
-  if not self.sock then
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    self.sock = sock
-  end
-
-  local ok, err = sock_send(self.sock, opt.protocol, REQ)
+  local ok, err = self:send_request(opt, REQ)
   if not ok then
-    self.sock:close()
-    self.sock = nil
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    ok, err = sock_send(sock, opt.protocol, REQ)
-    if not ok then
-      sock:close()
-      return nil, err
-    end
-    self.sock = sock
+    return false, err
   end
 
   local code, msg = httpc_response(self.sock, opt.protocol)
@@ -339,32 +311,9 @@ function httpc:put (domain, headers, body, timeout)
 
   local REQ = build_put_req(opt)
 
-  if not self.sock then
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    self.sock = sock
-  end
-
-  local ok, err = sock_send(self.sock, opt.protocol, REQ)
+  local ok, err = self:send_request(opt, REQ)
   if not ok then
-    self.sock:close()
-    self.sock = nil
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    ok, err = sock_send(sock, opt.protocol, REQ)
-    if not ok then
-      sock:close()
-      return nil, err
-    end
-    self.sock = sock
+    return false, err
   end
 
   local code, msg = httpc_response(self.sock, opt.protocol)
@@ -402,32 +351,9 @@ function httpc:json (domain, headers, json, timeout)
 
   local REQ = build_json_req(opt)
 
-  if not self.sock then
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    self.sock = sock
-  end
-
-  local ok, err = sock_send(self.sock, opt.protocol, REQ)
+  local ok, err = self:send_request(opt, REQ)
   if not ok then
-    self.sock:close()
-    self.sock = nil
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    ok, err = sock_send(sock, opt.protocol, REQ)
-    if not ok then
-      sock:close()
-      return nil, err
-    end
-    self.sock = sock
+    return false, err
   end
 
   local code, msg = httpc_response(self.sock, opt.protocol)
@@ -462,32 +388,9 @@ function httpc:file (domain, headers, files, timeout)
 
   local REQ = build_file_req(opt)
 
-  if not self.sock then
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    self.sock = sock
-  end
-
-  local ok, err = sock_send(self.sock, opt.protocol, REQ)
+  local ok, err = self:send_request(opt, REQ)
   if not ok then
-    self.sock:close()
-    self.sock = nil
-    local sock = sock_new():timeout(self.timeout)
-    local ok, err = sock_connect(sock, opt.protocol, opt.domain, opt.port)
-    if not ok then
-      sock:close()
-      return ok, err
-    end
-    ok, err = sock_send(sock, opt.protocol, REQ)
-    if not ok then
-      sock:close()
-      return nil, err
-    end
-    self.sock = sock
+    return false, err
   end
 
   local code, msg = httpc_response(self.sock, opt.protocol)
