@@ -124,7 +124,7 @@ local function PASER_METHOD(http, sock, max_body_size, buffer, METHOD, PATH, HEA
       content['args'] = form_argsencode(PATH)
     end
   elseif METHOD == "POST" or METHOD == "PUT" then
-    local body_len = toint(HEADER['Content-Length']) or toint(HEADER['Content-length'])
+    local body_len = toint(HEADER['Content-Length']) or toint(HEADER['Content-length']) or toint(HEADER['content-length'])
     if body_len and body_len > 0 then
       local BODY = ''
       local RECV_BODY = true
@@ -164,7 +164,7 @@ local function PASER_METHOD(http, sock, max_body_size, buffer, METHOD, PATH, HEA
       local XML_ENCODE_2  = 'application/xml'
       local JSON_ENCODE = 'application/json'
       local URL_ENCODE  = 'application/x-www-form-urlencoded'
-      local format = match(HEADER['Content-type'] or HEADER['Content-Type'] or '', '(.-/[^;]*)')
+      local format = match(HEADER['Content-type'] or HEADER['Content-Type'] or HEADER['content-type'] or '', '(.-/[^;]*)')
       if format == FILE_ENCODE then
         local BOUNDARY = match(HEADER['Content-Type'], '^.+=[%-]*(.+)')
         if BOUNDARY and BOUNDARY ~= '' then
