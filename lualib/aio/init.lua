@@ -26,12 +26,9 @@ local aio_readdir = laio.readdir
 local aio_readpath = laio.readpath
 local aio_truncate = laio.truncate
 
-local new_tab = require "sys".new_tab
-
 local type = type
 local assert = assert
 local toint = math.tointeger
-
 
 local aio = new_tab(0, 1 << 16)
 
@@ -52,10 +49,27 @@ function File:__gc()
   return true
 end
 
+-- 重置标志位
+function File:lseek(read_offset, write_offset)
+  if read_offset then
+    self:read_lseek(read_offset)
+  end
+  if write_offset then
+    self:write_lseek(write_offset)
+  end
+end
+
 -- 重置read_offset; 这个方法一般情况下不会用到, 除非你非常明白自己在做什么.
 function File:read_lseek(read_offset)
   if toint(read_offset) and toint(read_offset) >= 0 then
     self.read_offset = read_offset
+  end
+end
+
+-- 重置write_offset; 这个方法一般情况下不会用到, 除非你非常明白自己在做什么.
+function File:write_lseek(write_offset)
+  if toint(write_offset) and toint(write_offset) >= 0 then
+    self.write_offset = write_offset
   end
 end
 
@@ -115,10 +129,23 @@ function File:write( data )
     return nil, "Invalid file write data."
   end
   self.__WRITE__ = assert(not self.__WRITE__, "File:write方法不可以在多个协程中并发调用.")
-  local size, err = aio._write(self.fd, data)
+  -- 如果没有构建write_offset, 则需要通过stat构建; 否则永远只从尾部开始写入.
+  if not self.write_offset then
+    if not self.stat then
+      self.stat = aio.stat(self.path)
+    end
+    self.write_offset = self.stat.size
+  end
+  local size, err = aio._write(self.fd, data, self.write_offset)
+  if type(size) == 'number' then
+    self.stat.size = self.stat.size + size
+    self.write_offset = self.write_offset + size
+  end
   self.__WRITE__ = nil
   return size, err
 end
+
+-- function
 
 -- 刷新缓存
 function File:flush()
@@ -150,6 +177,9 @@ function File:clean()
   if toint(self.read_offset) then
     self.read_offset = 0
   end
+  if toint(self.write_offset) then
+    self.write_offset = 0
+  end
   self.stat = stat
   self.__CLEAN__ = nil
   return true
@@ -166,7 +196,7 @@ function File:close( ... )
   return aio._close(fd)
 end
 
--- 打开文件(始终以rw模式打开, 没有则会创建)
+-- 打开文件，并返回File(始终以rw模式打开, 没有则会创建)
 function aio.open(filename)
   local fd, err = aio._open(filename)
   if not fd then
@@ -177,7 +207,7 @@ function aio.open(filename)
     local t = new_tab(0, 3)
     t.current_co = co_self()
     t.event_co = co_new(function ( ok, err )
-      aio[t] = nil  
+      aio[t] = nil
       return co_wakeup(t.current_co, ok, err)
     end)
     aio[t] = true
@@ -187,7 +217,7 @@ function aio.open(filename)
   return File:new { fd = fd, path = filename }
 end
 
--- 仅返回fd
+-- 打开文件，并返回fd(始终以rw模式打开, 没有则会创建)
 function aio._open(filename)
   filename = assert(type(filename) == 'string' and filename ~= '' and filename ~= '.' and filename ~= '..' and filename, "Invalid filename.")
   local t = new_tab(0, 3)
@@ -201,7 +231,7 @@ function aio._open(filename)
   return co_wait()
 end
 
--- 打开文件, 如果
+-- 打开文件, 如果不存在则创建(返回File)
 function aio.create(filename)
   local fd, err = aio._create(filename)
   if not fd then
@@ -222,6 +252,7 @@ function aio.create(filename)
   return File:new { fd = fd, path = filename, stat = stat }
 end
 
+-- 打开文件, 如果存在则失败(返回fd)
 function aio._create(filename)
   filename = assert(type(filename) == 'string' and filename ~= '' and filename ~= '.' and filename ~= '..' and filename, "Invalid filename.")
   local t = new_tab(0, 3)
@@ -252,7 +283,7 @@ function aio._read(fd, bytes, offset)
 end
 
 -- 写入(追加)指定大小数据
-function aio._write(fd, data)
+function aio._write(fd, data, offset)
   fd = assert(toint(fd) and toint(fd) >= 0 and toint(fd), "Invalid fd.")
   data = assert(type(data) == 'string' and data ~= '' and data, "Invalid write data.")
   local t = new_tab(0, 3)
@@ -262,7 +293,7 @@ function aio._write(fd, data)
     return co_wakeup(t.current_co, size, err)
   end)
   aio[t] = true
-  aio_write(t.event_co, fd, data)
+  aio_write(t.event_co, fd, data, offset)
   return co_wait()
 end
 
@@ -286,7 +317,7 @@ function aio.mkdir(dir)
   local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok, err )
-    aio[t] = nil  
+    aio[t] = nil
     return co_wakeup(t.current_co, ok, err)
   end)
   aio[t] = true
@@ -300,7 +331,7 @@ function aio.rmdir(dir)
   local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok, err )
-    aio[t] = nil  
+    aio[t] = nil
     return co_wakeup(t.current_co, ok, err)
   end)
   aio[t] = true
@@ -318,7 +349,7 @@ function aio.stat(path)
   local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( list, err )
-    aio[t] = nil  
+    aio[t] = nil
     return co_wakeup(t.current_co, list, err)
   end)
   aio[t] = true
@@ -332,7 +363,7 @@ function aio.dir(path)
   local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( dirs )
-    aio[t] = nil  
+    aio[t] = nil
     return co_wakeup(t.current_co, dirs )
   end)
   aio[t] = true
@@ -347,7 +378,7 @@ function aio.rename(old_name, new_name)
   local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok )
-    aio[t] = nil  
+    aio[t] = nil
     return co_wakeup(t.current_co, ok)
   end)
   aio[t] = true
@@ -366,7 +397,7 @@ function aio.readpath(path)
   local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( path )
-    aio[t] = nil  
+    aio[t] = nil
     return co_wakeup(t.current_co, path )
   end)
   aio[t] = true
@@ -381,7 +412,7 @@ function aio.truncate(filename, length)
   local t = new_tab(0, 3)
   t.current_co = co_self()
   t.event_co = co_new(function ( ok, err )
-    aio[t] = nil  
+    aio[t] = nil
     return co_wakeup(t.current_co, ok, err)
   end)
   aio[t] = true

@@ -332,13 +332,15 @@ static int sp[2];
 static void AIO_WANT_POLL(void) {
   // printf("AIO_WANT_POLL Called. 工作线程ID为: %d\n", pthread_self());
   char event = '1';
-  write(sp[1], &event, 1);
+  int wsize = write(sp[1], &event, 1);
+  (void)wsize;
  }
 
 static void AIO_DONE_POLL(void) { 
   // printf("AIO_DONE_POLL Called. 主线程ID为: %d\n", pthread_self());
   char event = '2';
-  read(sp[0], &event, 1);
+  int rsize = read(sp[0], &event, 1);
+  (void)rsize;
 }
 
 static void AIO_EVENT(CORE_P_ core_io *io, int revents) {
@@ -455,7 +457,7 @@ static int laio_write(lua_State* L) {
   }
 
   /* 适用write来完成追加操作, 同时也不允许单线程覆盖写入. */
-  eio_write(fd, (void*)buffer, buffer_size, -1, EIO_PRI_DEFAULT, AIO_RESPONSE_WRITE, (void*)t);
+  eio_write(fd, (void*)buffer, buffer_size, lua_tointeger(L, 4), EIO_PRI_DEFAULT, AIO_RESPONSE_WRITE, (void*)t);
   return 1;
 }
 

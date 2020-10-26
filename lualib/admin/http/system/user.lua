@@ -20,7 +20,9 @@ local ipairs = ipairs
 local os_date = os.date
 local toint = math.tointeger
 
+local get_path = utils.get_path
 local get_locale = utils.get_locale
+local access_deny = utils.access_deny
 
 local template_path = 'lualib/admin/html/system/user/'
 
@@ -35,7 +37,7 @@ local function verify_permission (content, db)
   end
   local info = user.user_info(db, exists.uid)
   if not info or info.is_admin ~= 1 then
-    return false, config.login_render
+    return false, access_deny(get_path(content))
   end
   info.token = exists.token
   info.roles = role.role_permissions(db, info.role)
@@ -128,7 +130,7 @@ function system.user_response (content)
     return json_encode({code = 400, data = null, msg = '3. token不存在或权限不足'})
   end
   local user_info = user.user_info(db, exists.uid)
-  if not user_info or user_info.is_admin == 0 then
+  if not user_info or user_info.is_admin ~= 1 then
     return json_encode({code = 400, data = null, msg = '4. 用户权限不足'})
   end
   local action = args.action
@@ -142,6 +144,14 @@ function system.user_response (content)
       return json_encode({code = 400, data = null, msg = '2. 无效的参数'})
     end
     return json_encode({code = 0, data = users, count = count})
+  end
+  -- 清除所有用户登录状态
+  if action == "clear_login" then
+    local ok = user_token.flush_all(db, exists.uid)
+    if not ok then
+      return json_encode({code = 500, msg = "清除登录状态失败"})
+    end
+    return json_encode({code = 0, msg = "清除登录状态成功"})
   end
   -- 添加用户
   if action == 'add' then
