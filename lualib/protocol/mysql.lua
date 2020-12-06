@@ -141,23 +141,28 @@ local function sock_read (self, bytes)
 end
 
 -- mysql_native认证
-local function mysq_native_password(password, scramble)
-    if not password or password == "" then
-        return ""
-    end
-    local stage1 = sha1(password)
-    local stage2 = sha1(scramble .. sha1(stage1))
-    return xor_str(stage2, stage1)
+local function mysql_native_password(password, scramble)
+  if type(password) ~= 'string' or password == "" then
+    return ""
+  end
+  local stage1 = sha1(password)
+  local stage2 = sha1(scramble .. sha1(stage1))
+  return xor_str(stage2, stage1)
+end
+
+-- mysql_sha256认证
+local function mysql_sha256_password(password, scramble)
+  if type(password) ~= 'string' or password == "" then
+    return ""
+  end
+  local stage1 = sha2(password)
+  local stage2 = sha2(sha2(stage1) .. scramble)
+  return xor_str(stage1, stage2)
 end
 
 -- caching_sha2认证
 local function caching_sha2_password(password, scramble)
-    if not password or password == "" then
-        return ""
-    end
-    local stage1 = sha2(password)
-    local stage2 = sha2(sha2(stage1) .. scramble)
-    return xor_str(stage1, stage2)
+  return mysql_sha256_password(password, scramble)
 end
 
 -- RSA扩展公钥认证
@@ -487,7 +492,7 @@ local function mysql_login (self)
     token = caching_sha2_password(self.password, salt)
     req = strpack("<I4I4Bc23zs1zz", client_flags, self.max_packet_size, CHARSET_MAP[self.charset] or 33, strrep("\0", 23), self.username, token, self.database, "caching_sha2_password")
   else
-    token = mysq_native_password(self.password, salt)
+    token = mysql_native_password(self.password, salt)
     req = strpack("<I4I4Bc23zs1z", client_flags, self.max_packet_size, CHARSET_MAP[self.charset] or 33, strrep("\0", 23), self.username, token, self.database)
   end
 
@@ -503,13 +508,17 @@ local function mysql_login (self)
 
   local status, method = strbyte(packet, 1), strbyte(packet, 2)
 
-  if status == RESP_EOF then
-    return nil, "1. MySQL Authentication protocol not supported."
-  end
 
-  -- Auth Plugin Change
-  if auth_plugin == "caching_sha2_password" then
-    -- Need more authentication
+  -- Already Auth Success.
+  if status == 0x01 and method == 0x03 then
+    packet, err = read_packet(self)
+    if not packet then
+      return nil, err
+    end
+    status, method = strbyte(packet, 1), strbyte(packet, 2)
+  elseif status ~= RESP_ERROR then
+    -- specify auth method switch algorithm : caching_sha2_password / mysql_native_password
+    -- 1. Auth Plugin Need caching_sha2_password
     if status == 0x01 and method == 0x04 then
       self.packet_no = self.packet_no + 1
       send_packet(self, '\x02')
@@ -523,16 +532,33 @@ local function mysql_login (self)
       if not packet then
         return nil, err
       end
-      status, method = strbyte(packet, 1), strbyte(packet, 2)
     end
-    -- Already Caching sha2 password.
-    if status == 0x01 and method == 0x03 then
+
+    -- 2. Auth Plugin Need mysql_native_password
+    if status == 0xFE then
+      local auth_plugin, pos = strunpack("z", packet, 2)
+      if auth_plugin == "mysql_native_password" then
+        self.packet_no = self.packet_no + 1
+        send_packet(self, mysql_native_password(self.password, strunpack("<z", packet, pos)))
+      elseif auth_plugin == "sha256_password" then
+        self.packet_no = self.packet_no + 1
+        send_packet(self, '\x01')
+        local public_key, err = read_packet(self)
+        if not public_key then
+          return nil, err
+        end
+        self.packet_no = self.packet_no + 1
+        send_packet(self, rsa_encode(public_key:sub(2, -2), self.password .. "\x00", strunpack("<z", packet, pos)))
+      else
+        return nil, "1. MySQL Authentication protocol not supported: " .. (auth_plugin or "unknown")
+      end
       packet, err = read_packet(self)
       if not packet then
         return nil, err
       end
-      status, method = strbyte(packet, 1), strbyte(packet, 2)
     end
+
+    status, method = strbyte(packet, 1), strbyte(packet, 2)
   end
 
   -- Server Send Error Response.

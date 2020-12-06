@@ -43,19 +43,24 @@ static int lrandomkey(lua_State *L) {
 /* -- xor_str -- */
 
 
-#define lua_set_key_value(L, key, value) ({ lua_pushstring((L), (key)); lua_pushinteger((L), (value)); lua_rawset((L), -3); })
+#define lua_set_key_INT(L, key, value) ({ lua_pushstring((L), (key)); lua_pushinteger((L), (value)); lua_rawset((L), -3); })
+#define lua_set_key_STR(L, key, value) ({ lua_pushstring((L), (key)); lua_pushstring((L), (value)); lua_rawset((L), -3); })
 
 static int crypt_set_key_value(lua_State *L) {
+  /* OPENSSL VERSION NUMBER */
+  lua_set_key_INT(L, "OPENSSL_VERSION_NUMBER", OPENSSL_VERSION_NUMBER);
+  lua_set_key_STR(L, "OPENSSL_VERSION_TEXT", OPENSSL_VERSION_TEXT);
+
   /* 增加rsa填充方式常量 */
-  lua_set_key_value(L, "RSA_NO_PADDING", RSA_NO_PADDING);
-  lua_set_key_value(L, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING);
-  lua_set_key_value(L, "RSA_PKCS1_OAEP_PADDING", RSA_PKCS1_OAEP_PADDING);
+  lua_set_key_INT(L, "RSA_NO_PADDING", RSA_NO_PADDING);
+  lua_set_key_INT(L, "RSA_PKCS1_PADDING", RSA_PKCS1_PADDING);
+  lua_set_key_INT(L, "RSA_PKCS1_OAEP_PADDING", RSA_PKCS1_OAEP_PADDING);
 
   /* 增加rsa_sign/rsa_verify算法常量*/
-  lua_set_key_value(L, "nid_md5", NID_md5);
-  lua_set_key_value(L, "nid_sha1", NID_sha1);
-  lua_set_key_value(L, "nid_sha256", NID_sha256);
-  lua_set_key_value(L, "nid_sha512", NID_sha512);
+  lua_set_key_INT(L, "nid_md5", NID_md5);
+  lua_set_key_INT(L, "nid_sha1", NID_sha1);
+  lua_set_key_INT(L, "nid_sha256", NID_sha256);
+  lua_set_key_INT(L, "nid_sha512", NID_sha512);
 
   return 1;
 }
@@ -68,8 +73,6 @@ LUAMOD_API int luaopen_lcrypt(lua_State *L) {
     { "guid", lguid },
     { "hashkey", lhashkey },
     { "randomkey", lrandomkey },
-    { "desencode", ldesencode },
-    { "desdecode", ldesdecode },
     { "hexencode", ltohex },
     { "hexdecode", lfromhex },
     { "hmac64", lhmac64 },
@@ -94,9 +97,9 @@ LUAMOD_API int luaopen_lcrypt(lua_State *L) {
     { "hmac_md5", lhmac_md5 },
     { "hmac_sha1", lhmac_sha128 },
     { "hmac_sha128", lhmac_sha128 },
-    // { "hmac_sha224", lhmac_sha224 },
+    { "hmac_sha224", lhmac_sha224 },
     { "hmac_sha256", lhmac_sha256 },
-    // { "hmac_sha384", lhmac_sha384 },
+    { "hmac_sha384", lhmac_sha384 },
     { "hmac_sha512", lhmac_sha512 },
     { "hmac_hash", lhmac_hash },
     { "xor_str", lxor_str },
@@ -112,15 +115,36 @@ LUAMOD_API int luaopen_lcrypt(lua_State *L) {
     // aes 加密
     { "aes_ecb_encrypt", laes_ecb_encrypt },
     { "aes_cbc_encrypt", laes_cbc_encrypt },
-    // {"aes_cfb_encrypt", laes_cfb_encrypt},
-    // {"aes_ofb_encrypt", laes_ofb_encrypt},
-    // {"aes_ctr_encrypt", laes_ctr_encrypt},
+    { "aes_cfb_encrypt", laes_cfb_encrypt },
+    { "aes_ofb_encrypt", laes_ofb_encrypt },
+    { "aes_ctr_encrypt", laes_ctr_encrypt },
+    { "aes_gcm_encrypt", laes_gcm_encrypt },
     // aes 解密
     { "aes_ecb_decrypt", laes_ecb_decrypt },
     { "aes_cbc_decrypt", laes_cbc_decrypt },
-    // {"aes_cfb_decrypt", laes_cfb_decrypt},
-    // {"aes_ofb_decrypt", laes_ofb_decrypt},
-    // {"aes_ctr_decrypt", laes_ctr_decrypt},
+    { "aes_cfb_decrypt", laes_cfb_decrypt },
+    { "aes_ofb_decrypt", laes_ofb_decrypt },
+    { "aes_ctr_decrypt", laes_ctr_decrypt },
+    { "aes_gcm_decrypt", laes_gcm_decrypt },
+    // DES加密/解密
+    { "desencode", ldesencode },
+    { "desdecode", ldesdecode },
+    { "des_encrypt", ldes_encrypt },
+    { "des_decrypt", ldes_decrypt },
+    // SM2/SM3/SM4 国密
+    { "sm3", lsm3 },
+    { "hmac_sm3", lhmac_sm3 },
+    { "sm2keygen", lsm2keygen },
+    { "sm2sign", lsm2sign },
+    { "sm2verify", lsm2verify },
+    { "sm4_cbc_encrypt", lsm4_cbc_encrypt },
+    { "sm4_cbc_decrypt", lsm4_cbc_decrypt },
+    { "sm4_ecb_encrypt", lsm4_ecb_encrypt },
+    { "sm4_ecb_decrypt", lsm4_ecb_decrypt },
+    { "sm4_ofb_encrypt", lsm4_ofb_encrypt },
+    { "sm4_ofb_decrypt", lsm4_ofb_decrypt },
+    { "sm4_ctr_encrypt", lsm4_ctr_encrypt },
+    { "sm4_ctr_decrypt", lsm4_ctr_decrypt },
     { NULL, NULL },
   };
   luaL_newlib(L, lcrypt);
